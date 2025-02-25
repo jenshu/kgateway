@@ -9,6 +9,7 @@ import (
 	istiokube "istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/krt"
 	istiolog "istio.io/istio/pkg/log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
@@ -32,6 +33,8 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/client/clientset/versioned"
 	glooschemes "github.com/kgateway-dev/kgateway/v2/pkg/schemes"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
+	"github.com/kgateway-dev/kgateway/v2/pkg/utils/namespaces"
 )
 
 const (
@@ -46,8 +49,8 @@ type SetupOpts struct {
 
 	KrtDebugger *krt.DebugHandler
 
-	XdsHost string
-	XdsPort uint32
+	// static set of global Settings
+	GlobalSettings *settings.Settings
 }
 
 var setupLog = ctrl.Log.WithName("setup")
@@ -76,7 +79,6 @@ type ControllerBuilder struct {
 	cfg         StartConfig
 	mgr         ctrl.Manager
 	isOurGw     func(gw *apiv1.Gateway) bool
-	settings    settings.Settings
 }
 
 func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuilder, error) {
@@ -134,6 +136,7 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 		cfg.Client,
 		cli,
 		setupLog,
+		*cfg.SetupOpts.GlobalSettings,
 	)
 	gwClasses := sets.New(append(cfg.SetupOpts.ExtraGatewayClasses, wellknown.GatewayClassName)...)
 	isOurGw := func(gw *apiv1.Gateway) bool {
@@ -164,7 +167,6 @@ func NewControllerBuilder(ctx context.Context, cfg StartConfig) (*ControllerBuil
 		cfg:         cfg,
 		mgr:         mgr,
 		isOurGw:     isOurGw,
-		settings:    commoncol.Settings,
 	}, nil
 }
 
@@ -180,21 +182,22 @@ func pluginFactoryWithBuiltin(extraPlugins []extensionsplug.Plugin) extensions2.
 func (c *ControllerBuilder) Start(ctx context.Context) error {
 	logger := contextutils.LoggerFrom(ctx).Desugar()
 	logger.Info("starting gateway controller")
-	// GetXdsAddress waits for gloo-edge to populate the xds address of the server.
-	// in the future this logic may move here and be duplicated.
-	xdsHost, xdsPort := c.cfg.SetupOpts.XdsHost, c.cfg.SetupOpts.XdsPort
-	if xdsHost == "" {
-		return ctx.Err()
-	}
 
+	globalSettings := c.cfg.SetupOpts.GlobalSettings
+
+	xdsHost := kubeutils.ServiceFQDN(metav1.ObjectMeta{
+		Name:      globalSettings.XdsServiceName,
+		Namespace: namespaces.GetPodNamespace(),
+	})
+	xdsPort := globalSettings.XdsServicePort
 	logger.Info("got xds address for deployer", uzap.String("xds_host", xdsHost), uzap.Uint32("xds_port", xdsPort))
 
-	integrationEnabled := c.settings.EnableIstioIntegration
+	integrationEnabled := globalSettings.EnableIstioIntegration
 
 	// copy over relevant aws options (if any) from Settings
 	var awsInfo *deployer.AwsInfo
-	stsCluster := c.settings.StsClusterName
-	stsUri := c.settings.StsUri
+	stsCluster := globalSettings.StsClusterName
+	stsUri := globalSettings.StsUri
 	if stsCluster != "" && stsUri != "" {
 		awsInfo = &deployer.AwsInfo{
 			EnableServiceAccountCredentials: true,

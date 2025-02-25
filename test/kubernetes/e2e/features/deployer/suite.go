@@ -315,13 +315,11 @@ func xdsClusterAssertion(testInstallation *e2e.TestInstallation) func(ctx contex
 			g.Expect(xdsSocketAddress).NotTo(gomega.BeNil())
 
 			g.Expect(xdsSocketAddress.GetAddress()).To(gomega.Equal(kubeutils.ServiceFQDN(metav1.ObjectMeta{
-				Name:      kubeutils.GetXdsServiceName(),
+				Name:      "kgateway",
 				Namespace: testInstallation.Metadata.InstallNamespace,
 			})), "xds socket address points to gloo service, in installation namespace")
 
-			xdsPort, err := kubeutils.GetXdsServicePort()
-			g.Expect(err).NotTo(gomega.HaveOccurred())
-			g.Expect(xdsSocketAddress.GetPortValue()).To(gomega.Equal(xdsPort), "xds socket port points to gloo service, in installation namespace")
+			g.Expect(xdsSocketAddress.GetPortValue()).To(gomega.Equal(9977), "xds socket port points to gloo service, in installation namespace")
 		}).
 			WithContext(ctx).
 			WithTimeout(time.Second * 10).
