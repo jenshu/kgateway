@@ -2,6 +2,7 @@ package deployer
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -18,7 +19,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envoyutils/admincli"
-	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
 	testdefaults "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
 )
@@ -33,7 +33,7 @@ type testingSuite struct {
 	ctx context.Context
 
 	// testInstallation contains all the metadata/utilities necessary to execute a series of tests
-	// against an installation of Gloo Gateway
+	// against an installation of kgateway
 	testInstallation *e2e.TestInstallation
 
 	// manifests maps test name to a list of manifests to apply before the test
@@ -71,10 +71,6 @@ func (s *testingSuite) SetupSuite() {
 		},
 		"TestSelfManagedGateway": {
 			selfManagedGateway,
-		},
-		"TestConfigureAwsLambda": {
-			testdefaults.NginxPodManifest,
-			gatewayWithoutParameters,
 		},
 	}
 	s.manifestObjects = map[string][]client.Object{
@@ -156,18 +152,6 @@ func (s *testingSuite) TestConfigureProxiesFromGatewayParameters() {
 	)
 }
 
-/*
-func (s *testingSuite) TestConfigureAwsLambda() {
-	s.testInstallation.Assertions.EventuallyReadyReplicas(s.ctx, proxyDeployment.ObjectMeta, gomega.Equal(1))
-
-	s.testInstallation.Assertions.AssertEnvoyAdminApi(
-		s.ctx,
-		proxyDeployment.ObjectMeta,
-		awsStsClusterAssertion(s.testInstallation),
-	)
-}
-*/
-
 func (s *testingSuite) TestProvisionResourcesUpdatedWithValidParameters() {
 	s.testInstallation.Assertions.EventuallyReadyReplicas(s.ctx, proxyDeployment.ObjectMeta, gomega.Equal(1))
 
@@ -221,7 +205,6 @@ func (s *testingSuite) TestProvisionResourcesNotUpdatedWithInvalidParameters() {
 		g.Expect(proxyDeployment.Spec.Template.Spec.Containers[0].SecurityContext.Privileged).To(origPrivileged)
 		g.Expect(proxyDeployment.Spec.Replicas).To(gstruct.PointTo(gomega.Equal(int32(1))))
 	}, "30s", "1s").Should(gomega.Succeed())
-
 }
 
 func (s *testingSuite) TestSelfManagedGateway() {
@@ -311,12 +294,11 @@ func xdsClusterAssertion(testInstallation *e2e.TestInstallation) func(ctx contex
 			xdsSocketAddress := xdsCluster.GetLoadAssignment().GetEndpoints()[0].GetLbEndpoints()[0].GetEndpoint().GetAddress().GetSocketAddress()
 			g.Expect(xdsSocketAddress).NotTo(gomega.BeNil())
 
-			g.Expect(xdsSocketAddress.GetAddress()).To(gomega.Equal(kubeutils.ServiceFQDN(metav1.ObjectMeta{
-				Name:      "kgateway",
-				Namespace: testInstallation.Metadata.InstallNamespace,
-			})), "xds socket address points to gloo service, in installation namespace")
+			g.Expect(xdsSocketAddress.GetAddress()).To(gomega.Equal(
+				fmt.Sprintf("kgateway.%s.svc.cluster.local", testInstallation.Metadata.InstallNamespace),
+			), "xds socket address points to kgateway service, in installation namespace")
 
-			g.Expect(xdsSocketAddress.GetPortValue()).To(gomega.Equal(9977), "xds socket port points to gloo service, in installation namespace")
+			g.Expect(xdsSocketAddress.GetPortValue()).To(gomega.Equal(9977), "xds socket port points to kgateway service, in installation namespace")
 		}).
 			WithContext(ctx).
 			WithTimeout(time.Second * 10).
@@ -324,52 +306,3 @@ func xdsClusterAssertion(testInstallation *e2e.TestInstallation) func(ctx contex
 			Should(gomega.Succeed())
 	}
 }
-
-// awsStsClusterAssertion asserts that:
-// - if the installation is configured to use aws with service account creds, then the proxy contains an aws sts cluster with the expected sts uri
-// - if the installation is NOT configured to use aws with service account creds, then no aws sts cluster should exist on the proxy
-/*
-func awsStsClusterAssertion(testInstallation *e2e.TestInstallation) func(ctx context.Context, adminClient *admincli.Client) {
-	// get aws values from installation
-	awsOpts := testInstallation.Metadata.AwsOptions
-	shouldHaveStsCluster := awsOpts != nil && awsOpts.EnableServiceAccountCredentials
-	var expectedStsUri string
-	if shouldHaveStsCluster {
-		expectedStsUri = fmt.Sprintf("sts.%s.amazonaws.com", awsOpts.StsCredentialsRegion)
-	}
-
-	return func(ctx context.Context, adminClient *admincli.Client) {
-		testInstallation.Assertions.Gomega.Eventually(func(g gomega.Gomega) {
-			clusters, err := adminClient.GetStaticClusters(ctx)
-			g.Expect(err).NotTo(gomega.HaveOccurred(), "can get static clusters from config dump")
-
-			awsStsCluster, ok := clusters["aws_sts_cluster"]
-			if shouldHaveStsCluster {
-				g.Expect(ok).To(gomega.BeTrue(), "should contain cluster aws_sts_cluster")
-			} else {
-				g.Expect(ok).To(gomega.BeFalse(), "should not contain cluster aws_sts_cluster")
-				// nothing else to test, so return here
-				return
-			}
-
-			// check that transport socket has expected values
-			msg, err := utils.AnyToMessage(awsStsCluster.GetTransportSocket().GetTypedConfig())
-			g.Expect(err).NotTo(gomega.HaveOccurred())
-			tlsCtx, ok := msg.(*tlsv3.UpstreamTlsContext)
-			g.Expect(ok).To(gomega.BeTrue(), "should be able to get UpstreamTlsContext")
-			g.Expect(tlsCtx.GetSni()).To(gomega.Equal(expectedStsUri))
-
-			// check that load assignment has expected values
-			g.Expect(awsStsCluster.GetLoadAssignment().GetEndpoints()).To(gomega.HaveLen(1))
-			g.Expect(awsStsCluster.GetLoadAssignment().GetEndpoints()[0].GetLbEndpoints()).To(gomega.HaveLen(1))
-			socketAddr := awsStsCluster.GetLoadAssignment().GetEndpoints()[0].GetLbEndpoints()[0].GetEndpoint().GetAddress().GetSocketAddress()
-			g.Expect(socketAddr).NotTo(gomega.BeNil())
-			g.Expect(socketAddr.GetAddress()).To(gomega.Equal(expectedStsUri))
-		}).
-			WithContext(ctx).
-			WithTimeout(time.Second * 10).
-			WithPolling(time.Millisecond * 200).
-			Should(gomega.Succeed())
-	}
-}
-*/
