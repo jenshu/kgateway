@@ -1,13 +1,9 @@
-//go:build ignore
-
 package deployer
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	tlsv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	"github.com/onsi/gomega"
 	"github.com/onsi/gomega/gstruct"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +16,6 @@ import (
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
-	"github.com/kgateway-dev/kgateway/v2/internal/gloo/pkg/utils"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/wellknown"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envoyutils/admincli"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils"
@@ -123,7 +118,7 @@ func (s *testingSuite) TestConfigureProxiesFromGatewayParameters() {
 	// check that the labels and annotations got passed through from GatewayParameters to the ServiceAccount
 	sa := &corev1.ServiceAccount{}
 	err := s.testInstallation.ClusterContext.Client.Get(s.ctx,
-		types.NamespacedName{Name: glooProxyObjectMeta.Name, Namespace: glooProxyObjectMeta.Namespace},
+		types.NamespacedName{Name: proxyObjectMeta.Name, Namespace: proxyObjectMeta.Namespace},
 		sa)
 	s.Require().NoError(err)
 	s.testInstallation.Assertions.Gomega.Expect(sa.GetLabels()).To(
@@ -134,7 +129,7 @@ func (s *testingSuite) TestConfigureProxiesFromGatewayParameters() {
 	// check that the labels and annotations got passed through from GatewayParameters to the Service
 	svc := &corev1.Service{}
 	err = s.testInstallation.ClusterContext.Client.Get(s.ctx,
-		types.NamespacedName{Name: glooProxyObjectMeta.Name, Namespace: glooProxyObjectMeta.Namespace},
+		types.NamespacedName{Name: proxyObjectMeta.Name, Namespace: proxyObjectMeta.Namespace},
 		svc)
 	s.Require().NoError(err)
 	s.testInstallation.Assertions.Gomega.Expect(svc.GetLabels()).To(
@@ -161,6 +156,7 @@ func (s *testingSuite) TestConfigureProxiesFromGatewayParameters() {
 	)
 }
 
+/*
 func (s *testingSuite) TestConfigureAwsLambda() {
 	s.testInstallation.Assertions.EventuallyReadyReplicas(s.ctx, proxyDeployment.ObjectMeta, gomega.Equal(1))
 
@@ -170,6 +166,7 @@ func (s *testingSuite) TestConfigureAwsLambda() {
 		awsStsClusterAssertion(s.testInstallation),
 	)
 }
+*/
 
 func (s *testingSuite) TestProvisionResourcesUpdatedWithValidParameters() {
 	s.testInstallation.Assertions.EventuallyReadyReplicas(s.ctx, proxyDeployment.ObjectMeta, gomega.Equal(1))
@@ -231,7 +228,7 @@ func (s *testingSuite) TestSelfManagedGateway() {
 	s.Require().EventuallyWithT(func(c *assert.CollectT) {
 		gw := &gwv1.Gateway{}
 		err := s.testInstallation.ClusterContext.Client.Get(s.ctx,
-			types.NamespacedName{Name: glooProxyObjectMeta.Name, Namespace: glooProxyObjectMeta.Namespace},
+			types.NamespacedName{Name: proxyObjectMeta.Name, Namespace: proxyObjectMeta.Namespace},
 			gw)
 		assert.NoError(c, err, "gateway not found")
 
@@ -331,6 +328,7 @@ func xdsClusterAssertion(testInstallation *e2e.TestInstallation) func(ctx contex
 // awsStsClusterAssertion asserts that:
 // - if the installation is configured to use aws with service account creds, then the proxy contains an aws sts cluster with the expected sts uri
 // - if the installation is NOT configured to use aws with service account creds, then no aws sts cluster should exist on the proxy
+/*
 func awsStsClusterAssertion(testInstallation *e2e.TestInstallation) func(ctx context.Context, adminClient *admincli.Client) {
 	// get aws values from installation
 	awsOpts := testInstallation.Metadata.AwsOptions
@@ -374,3 +372,4 @@ func awsStsClusterAssertion(testInstallation *e2e.TestInstallation) func(ctx con
 			Should(gomega.Succeed())
 	}
 }
+*/

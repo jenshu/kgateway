@@ -1,5 +1,3 @@
-//go:build ignore
-
 package deployer
 
 import (
@@ -22,13 +20,13 @@ var (
 	selfManagedGateway       = filepath.Join(fsutils.MustGetThisDir(), "testdata", "self-managed-gateway.yaml")
 
 	// When we apply the deployer-provision.yaml file, we expect resources to be created with this metadata
-	glooProxyObjectMeta = metav1.ObjectMeta{
+	proxyObjectMeta = metav1.ObjectMeta{
 		Name:      "gw",
 		Namespace: "default",
 	}
-	proxyDeployment     = &appsv1.Deployment{ObjectMeta: glooProxyObjectMeta}
-	proxyService        = &corev1.Service{ObjectMeta: glooProxyObjectMeta}
-	proxyServiceAccount = &corev1.ServiceAccount{ObjectMeta: glooProxyObjectMeta}
+	proxyDeployment     = &appsv1.Deployment{ObjectMeta: proxyObjectMeta}
+	proxyService        = &corev1.Service{ObjectMeta: proxyObjectMeta}
+	proxyServiceAccount = &corev1.ServiceAccount{ObjectMeta: proxyObjectMeta}
 
 	gwParamsDefault = &v1alpha1.GatewayParameters{
 		ObjectMeta: metav1.ObjectMeta{

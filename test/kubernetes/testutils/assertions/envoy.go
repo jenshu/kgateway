@@ -1,5 +1,3 @@
-//go:build ignore
-
 package assertions
 
 import (
@@ -11,10 +9,10 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/internal/gloo/pkg/defaults"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envoyutils/admincli"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils/portforward"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
+	"github.com/kgateway-dev/kgateway/v2/test/helpers"
 )
 
 func (p *Provider) AssertEnvoyAdminApi(
@@ -27,7 +25,7 @@ func (p *Provider) AssertEnvoyAdminApi(
 
 	portForwarder, err := p.clusterContext.Cli.StartPortForward(ctx,
 		portforward.WithDeployment(envoyDeployment.GetName(), envoyDeployment.GetNamespace()),
-		portforward.WithPorts(int(defaults.EnvoyAdminPort), int(defaults.EnvoyAdminPort)),
+		portforward.WithPorts(int(helpers.EnvoyAdminPort), int(helpers.EnvoyAdminPort)),
 	)
 	p.Require.NoError(err, "can open port-forward")
 	defer func() {
@@ -50,7 +48,7 @@ func (p *Provider) AssertEnvoyAdminApi(
 		WithReceiver(io.Discard). // adminAssertion can overwrite this
 		WithCurlOptions(
 			curl.WithRetries(3, 0, 10),
-			curl.WithPort(int(defaults.EnvoyAdminPort)),
+			curl.WithPort(int(helpers.EnvoyAdminPort)),
 		)
 
 	for _, adminAssertion := range adminAssertions {
