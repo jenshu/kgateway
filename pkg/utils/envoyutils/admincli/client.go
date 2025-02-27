@@ -18,6 +18,9 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils/portforward"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/protoutils"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
+
+	// import for side effects; this is needed so we can unmarshal envoy types
+	_ "github.com/kgateway-dev/kgateway/v2/internal/envoyinit/hack/filter_types"
 )
 
 const (
