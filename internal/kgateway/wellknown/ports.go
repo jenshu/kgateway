@@ -13,3 +13,6 @@ var DefaultXdsPort uint32 = 9977
 
 // EnvoyAdminPort is the default envoy admin port
 var EnvoyAdminPort uint32 = 19000
+
+// KgatewayAdminPort is the kgateway admin server port
+var KgatewayAdminPort uint32 = 9097
