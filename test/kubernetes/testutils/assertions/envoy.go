@@ -3,8 +3,6 @@ package assertions
 import (
 	"context"
 	"io"
-	"net"
-	"time"
 
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,7 +10,6 @@ import (
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/envoyutils/admincli"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/kubeutils/portforward"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
-	"github.com/kgateway-dev/kgateway/v2/test/helpers"
 )
 
 func (p *Provider) AssertEnvoyAdminApi(
@@ -25,7 +22,7 @@ func (p *Provider) AssertEnvoyAdminApi(
 
 	portForwarder, err := p.clusterContext.Cli.StartPortForward(ctx,
 		portforward.WithDeployment(envoyDeployment.GetName(), envoyDeployment.GetNamespace()),
-		portforward.WithPorts(int(helpers.EnvoyAdminPort), int(helpers.EnvoyAdminPort)),
+		portforward.WithPorts(int(admincli.EnvoyAdminPort), int(admincli.EnvoyAdminPort)),
 	)
 	p.Require.NoError(err, "can open port-forward")
 	defer func() {
@@ -33,22 +30,11 @@ func (p *Provider) AssertEnvoyAdminApi(
 		portForwarder.WaitForStop()
 	}()
 
-	// the port-forward returns before it completely starts up (https://github.com/kgateway-dev/kgateway/issues/9353),
-	// so as a workaround we try to keep dialing the address until it succeeds
-	p.Gomega.Eventually(func(g Gomega) {
-		_, err = net.Dial("tcp", portForwarder.Address())
-		g.Expect(err).NotTo(HaveOccurred())
-	}).
-		WithContext(ctx).
-		WithTimeout(time.Second * 15).
-		WithPolling(time.Second).
-		Should(Succeed())
-
 	adminClient := admincli.NewClient().
 		WithReceiver(io.Discard). // adminAssertion can overwrite this
 		WithCurlOptions(
 			curl.WithRetries(3, 0, 10),
-			curl.WithPort(int(helpers.EnvoyAdminPort)),
+			curl.WithPort(int(admincli.EnvoyAdminPort)),
 		)
 
 	for _, adminAssertion := range adminAssertions {

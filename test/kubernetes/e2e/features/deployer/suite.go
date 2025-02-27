@@ -102,6 +102,14 @@ func (s *testingSuite) AfterTest(suiteName, testName string) {
 		s.Require().NoError(err)
 		s.testInstallation.Assertions.EventuallyObjectsNotExist(s.ctx, s.manifestObjects[manifest]...)
 	}
+
+	// make sure the proxy pods are gone before the next test starts
+	s.testInstallation.Assertions.EventuallyPodsNotExist(
+		s.ctx,
+		s.testInstallation.Metadata.InstallNamespace,
+		metav1.ListOptions{
+			LabelSelector: "app.kubernetes.io/name=gw",
+		})
 }
 
 func (s *testingSuite) TestProvisionDeploymentAndService() {
@@ -146,7 +154,7 @@ func (s *testingSuite) TestConfigureProxiesFromGatewayParameters() {
 
 	s.testInstallation.Assertions.AssertEnvoyAdminApi(
 		s.ctx,
-		proxyDeployment.ObjectMeta,
+		proxyObjectMeta,
 		serverInfoLogLevelAssertion(s.testInstallation, "debug", "connection:trace,upstream:debug"),
 		xdsClusterAssertion(s.testInstallation),
 	)
