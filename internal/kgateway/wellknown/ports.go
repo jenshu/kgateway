@@ -10,3 +10,6 @@ const DefaultXdsService = "kgateway"
 // - the default value of `XdsServicePort` in internal/kgateway/extensions2/settings/settings.go
 // - the `controller.service.ports.grpc` value in install/helm/kgateway/values.yaml
 var DefaultXdsPort uint32 = 9977
+
+// EnvoyAdminPort is the default envoy admin port
+var EnvoyAdminPort uint32 = 19000
