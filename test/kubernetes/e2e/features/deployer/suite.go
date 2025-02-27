@@ -303,10 +303,11 @@ func xdsClusterAssertion(testInstallation *e2e.TestInstallation) func(ctx contex
 			g.Expect(xdsSocketAddress).NotTo(gomega.BeNil())
 
 			g.Expect(xdsSocketAddress.GetAddress()).To(gomega.Equal(
-				fmt.Sprintf("kgateway.%s.svc.cluster.local", testInstallation.Metadata.InstallNamespace),
+				fmt.Sprintf("%s.%s.svc.cluster.local", wellknown.DefaultXdsService, testInstallation.Metadata.InstallNamespace),
 			), "xds socket address points to kgateway service, in installation namespace")
 
-			g.Expect(xdsSocketAddress.GetPortValue()).To(gomega.Equal(uint32(9977)), "xds socket port points to kgateway service, in installation namespace")
+			g.Expect(xdsSocketAddress.GetPortValue()).To(gomega.Equal(wellknown.DefaultXdsPort),
+				"xds socket port points to kgateway service, in installation namespace")
 		}).
 			WithContext(ctx).
 			WithTimeout(time.Second * 10).
