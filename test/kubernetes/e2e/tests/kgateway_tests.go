@@ -13,7 +13,7 @@ import (
 	// "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/listener_options"
 	// "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/metrics"
 	// "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/port_routing"
-	// "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/route_delegation"
+	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/route_delegation"
 	// "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/route_options"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/services/httproute"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/features/services/tcproute"
@@ -27,7 +27,6 @@ func KubeGatewaySuiteRunner() e2e.SuiteRunner {
 
 	kubeGatewaySuiteRunner.Register("BasicRouting", basicrouting.NewTestingSuite)
 	kubeGatewaySuiteRunner.Register("Deployer", deployer.NewTestingSuite)
-
 	// kubeGatewaySuiteRunner.Register("HttpListenerOptions", http_listener_options.NewTestingSuite)
 	// kubeGatewaySuiteRunner.Register("ListenerOptions", listener_options.NewTestingSuite)
 	// kubeGatewaySuiteRunner.Register("RouteOptions", route_options.NewTestingSuite)
@@ -38,7 +37,7 @@ func KubeGatewaySuiteRunner() e2e.SuiteRunner {
 	kubeGatewaySuiteRunner.Register("TLSRouteServices", tlsroute.NewTestingSuite)
 	// kubeGatewaySuiteRunner.Register("HeadlessSvc", headless_svc.NewK8sGatewayHeadlessSvcSuite)
 	// kubeGatewaySuiteRunner.Register("PortRouting", port_routing.NewK8sGatewayTestingSuite)
-	// kubeGatewaySuiteRunner.Register("RouteDelegation", route_delegation.NewTestingSuite)
+	kubeGatewaySuiteRunner.Register("RouteDelegation", route_delegation.NewTestingSuite)
 	// kubeGatewaySuiteRunner.Register("GlooAdminServer", admin_server.NewTestingSuite)
 	// kubeGatewaySuiteRunner.Register("DirectResponse", directresponse.NewTestingSuite)
 	// kubeGatewaySuiteRunner.Register("CRDCategories", crd_categories.NewTestingSuite)
