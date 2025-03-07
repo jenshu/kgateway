@@ -431,6 +431,6 @@ var _ = FDescribeTable("Route Delegation translator",
 	XEntry("RoutePolicy merge child override on no conflict", "route_policy_inheritance_child_override_ok.yaml", ""),
 	XEntry("RoutePolicy multi level inheritance with child override", "route_policy_multi_level_inheritance_override_ok.yaml", ""),
 	XEntry("RoutePolicy filter override merge", "route_policy_filter_override_merge.yaml", ""),
-	Entry("Child route matcher does not match parent", "bug-6621.yaml", ""),
-	Entry("Multi-level multiple parents delegation", "bug-10379.yaml", ""),
+	Entry("Child route matcher does not match parent", "discard_invalid_child_matches.yaml", ""),
+	Entry("Multi-level multiple parents delegation", "multi_level_multiple_parents.yaml", ""),
 )
