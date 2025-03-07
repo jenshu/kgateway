@@ -17,7 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/reports"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/routeutils"
@@ -249,8 +248,9 @@ func (h *httpRouteConfigurationTranslator) runBackendPolicies(ctx context.Contex
 func (h *httpRouteConfigurationTranslator) runBackend(ctx context.Context, in ir.HttpBackend, pCtx *ir.RouteBackendContext, outRoute *envoy_config_route_v3.Route) error {
 	var errs []error
 	if in.Backend.BackendObject != nil {
-		if in.Backend.BackendObject.GetGroupKind().Kind == v1alpha1.BackendGVK.Kind {
-			err := h.PluginPass[in.Backend.BackendObject.GetGroupKind()].ApplyForBackend(ctx, pCtx, in, outRoute)
+		backendPass := h.PluginPass[in.Backend.BackendObject.GetGroupKind()]
+		if backendPass != nil {
+			err := backendPass.ApplyForBackend(ctx, pCtx, in, outRoute)
 			if err != nil {
 				errs = append(errs, err)
 			}
