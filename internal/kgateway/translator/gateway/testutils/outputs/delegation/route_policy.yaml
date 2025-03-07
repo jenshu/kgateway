@@ -38,6 +38,7 @@ Routes:
       route:
         cluster: kube_a_svc-a_8080
         clusterNotFoundResponseCode: INTERNAL_SERVER_ERROR
+        timeout: 123s
     - match:
         prefix: /
       name: http~example_com-route-2-httproute-example-route-infra-0-0-matcher-0
