@@ -12,7 +12,6 @@ import (
 	envoyhttp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/durationpb"
 	"istio.io/istio/pkg/kube/krt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -47,7 +46,6 @@ type routePolicy struct {
 }
 
 type routeSpecIr struct {
-	timeout                    *durationpb.Duration
 	AI                         *v1alpha1.AIRoutePolicy
 	transform                  *anypb.Any
 	rustformation              *anypb.Any
@@ -65,9 +63,6 @@ func (d *routePolicy) Equals(in any) bool {
 		return false
 	}
 
-	if !proto.Equal(d.spec.timeout, d2.spec.timeout) {
-		return false
-	}
 	if !proto.Equal(d.spec.transform, d2.spec.transform) {
 		return false
 	}
@@ -159,9 +154,6 @@ func (p *routePolicyPluginGwPass) ApplyForRoute(ctx context.Context, pCtx *ir.Ro
 	policy, ok := pCtx.Policy.(*routePolicy)
 	if !ok {
 		return nil
-	}
-	if policy.spec.timeout != nil && outputRoute.GetRoute() != nil {
-		outputRoute.GetRoute().Timeout = policy.spec.timeout
 	}
 
 	if policy.spec.transform != nil {
@@ -336,10 +328,6 @@ func buildTranslateFunc(ctx context.Context, secrets *krtcollections.SecretIndex
 		policyIr := routePolicy{ct: policyCR.CreationTimestamp.Time}
 
 		outSpec := routeSpecIr{}
-
-		if policyCR.Spec.Timeout > 0 {
-			outSpec.timeout = durationpb.New(time.Second * time.Duration(policyCR.Spec.Timeout))
-		}
 
 		// Pass along the AI spec as is
 		outSpec.AI = policyCR.Spec.AI
