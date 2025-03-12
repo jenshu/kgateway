@@ -52,10 +52,10 @@ import (
 )
 
 func getAssetsDir(t *testing.T) string {
-	assets := ""
+	var assets string
 	if os.Getenv("KUBEBUILDER_ASSETS") == "" {
 		// set default if not user provided
-		out, err := exec.Command("sh", "-c", "make -sC $(dirname $(go env GOMOD))/internal/kgateway envtest-path").CombinedOutput()
+		out, err := exec.Command("sh", "-c", "make -sC $(dirname $(go env GOMOD)) envtest-path").CombinedOutput()
 		t.Log("out:", string(out))
 		if err != nil {
 			t.Fatalf("failed to get assets dir: %v", err)
@@ -105,6 +105,14 @@ func NewTestLogger() *zap.Logger {
 func init() {
 	log.SetLogger(zapr.NewLogger(logger))
 	grpclog.SetLoggerV2(grpclog.NewLoggerV2WithVerbosity(writer, writer, writer, 100))
+}
+
+func TestWithStandardSettings(t *testing.T) {
+	st, err := settings.BuildSettings()
+	if err != nil {
+		t.Fatalf("can't get settings %v", err)
+	}
+	runScenario(t, "testdata/standard", st)
 }
 
 func TestWithAutoDns(t *testing.T) {
@@ -323,7 +331,7 @@ func testScenario(
 		t.Fatal("wrote out file - nothing to test")
 	}
 	dump.Compare(t, expectedXdsDump)
-	t.Logf("%s passed", t.Name())
+	t.Logf("%s finished", t.Name())
 }
 
 // logKrtState logs the krt state with a message
