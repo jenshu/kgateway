@@ -39,6 +39,7 @@ import (
 
 const transformationFilterNamePrefix = "transformation"
 const rustformationFilterNamePrefix = "dynamic_modules/simple_mutations"
+const metadataRouteTransformation = "transformation/helper"
 
 type routePolicy struct {
 	ct       time.Time
@@ -65,6 +66,9 @@ func (d *routePolicy) Equals(in any) bool {
 		return false
 	}
 
+	if d.ct != d2.ct {
+		return false
+	}
 	if !proto.Equal(d.spec.timeout, d2.spec.timeout) {
 		return false
 	}
@@ -74,12 +78,18 @@ func (d *routePolicy) Equals(in any) bool {
 	if !proto.Equal(d.spec.rustformation, d2.spec.rustformation) {
 		return false
 	}
+	if d.AISecret != nil && d2.AISecret != nil && !d.AISecret.Equals(*d2.AISecret) {
+		return false
+	}
+	if (d.AISecret != nil) != (d2.AISecret != nil) {
+		return false
+	}
 
 	return true
 }
 
 type routePolicyPluginGwPass struct {
-	setTransformationInChain bool // TODO(nfuden): mae this multi stage
+	setTransformationInChain bool // TODO(nfuden): make this multi stage
 	// TODO(nfuden): dont abuse httplevel filter in favor of route level
 	rustformationStash map[string]string
 	ir.UnimplementedProxyTranslationPass
@@ -222,7 +232,7 @@ func (p *routePolicyPluginGwPass) ApplyForRoute(ctx context.Context, pCtx *ir.Ro
 				},
 			},
 		}
-		outputRoute.GetTypedPerFilterConfig()["helper/perroute/transform"], _ = utils.MessageToAny(setmetaTransform)
+		outputRoute.GetTypedPerFilterConfig()[metadataRouteTransformation], _ = utils.MessageToAny(setmetaTransform)
 
 		p.setTransformationInChain = true
 	}
@@ -312,7 +322,7 @@ func (p *routePolicyPluginGwPass) HttpFilters(ctx context.Context, fcc ir.Filter
 
 		// filters = append(filters, plugins.MustNewStagedFilter(setFilterStateFilterName,
 		// 	&set_filter_statev3.Config{}, plugins.AfterStage(plugins.FaultStage)))
-		filters = append(filters, plugins.MustNewStagedFilter("helper/perroute/transform",
+		filters = append(filters, plugins.MustNewStagedFilter(metadataRouteTransformation,
 			&transformationpb.FilterTransformations{},
 			plugins.AfterStage(plugins.FaultStage)))
 	}
@@ -347,7 +357,7 @@ func buildTranslateFunc(ctx context.Context, secrets *krtcollections.SecretIndex
 		policyIr.AISecret = aiSecretForSpec(ctx, secrets, krtctx, policyCR)
 
 		// Apply transformation specific translation
-		transformationForSpec(policyCR.Spec, outSpec)
+		transformationForSpec(policyCR.Spec, &outSpec)
 
 		for _, err := range outSpec.errors {
 			contextutils.LoggerFrom(ctx).Error(policyCR.GetNamespace(), policyCR.GetName(), err)
@@ -386,7 +396,7 @@ func aiSecretForSpec(
 }
 
 // transformationForSpec translates the transformation spec into and onto the IR policy
-func transformationForSpec(spec v1alpha1.RoutePolicySpec, out routeSpecIr) {
+func transformationForSpec(spec v1alpha1.RoutePolicySpec, out *routeSpecIr) {
 	var err error
 	if !useRustformations {
 		out.transform, err = toTransformFilterConfig(&spec.Transformation)
