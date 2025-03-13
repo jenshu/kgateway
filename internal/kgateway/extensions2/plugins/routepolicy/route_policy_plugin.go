@@ -64,10 +64,19 @@ func (d *routePolicy) Equals(in any) bool {
 		return false
 	}
 
+	if d.ct != d2.ct {
+		return false
+	}
 	if !proto.Equal(d.spec.transform, d2.spec.transform) {
 		return false
 	}
 	if !proto.Equal(d.spec.rustformation, d2.spec.rustformation) {
+		return false
+	}
+	if d.AISecret != nil && d2.AISecret != nil && !d.AISecret.Equals(*d2.AISecret) {
+		return false
+	}
+	if (d.AISecret != nil) != (d2.AISecret != nil) {
 		return false
 	}
 
