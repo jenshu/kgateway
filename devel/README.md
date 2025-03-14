@@ -6,7 +6,6 @@ Find tools and information to help you develop the kgateway project.
 * `contributing`: Information to help you contribute to the project, such as how to open issues, review pull requests, generate code, and backport fixes.
 * `debugging`: Troubleshooting steps for debugging frequent issues.
 * `testing`: Descriptions on how the tests work and how to use them.
-* `tools`: A set of scripts and tools that are intended to help you develop the kgateway project's codebase. Learn more about these tools in the short descriptions later in this readme.
 
 Other resources:
 * [Developer guide (Gloo Edge API)](https://docs.solo.io/gloo-edge/latest/guides/dev/) - 
