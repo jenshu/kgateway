@@ -368,7 +368,7 @@ var _ = DescribeTable("Basic GatewayTranslator Tests",
 	}),
 )
 
-var _ = FDescribeTable("Route Delegation translator",
+var _ = DescribeTable("Route Delegation translator",
 	func(inputFile string, errdesc string) {
 		dir := fsutils.MustGetThisDir()
 		testutils.TestTranslation(
@@ -403,7 +403,7 @@ var _ = FDescribeTable("Route Delegation translator",
 	Entry("Relative paths", "relative_paths.yaml", ""),
 	Entry("Nested absolute and relative path inheritance", "nested_absolute_relative.yaml", ""),
 	Entry("RoutePolicy only on child", "route_policy.yaml", ""),
-	XEntry("RoutePolicy inheritance from parent", "route_policy_inheritance.yaml", ""),
+	Entry("RoutePolicy inheritance from parent", "route_policy_inheritance.yaml", ""),
 	XEntry("RoutePolicy ignore child override on conflict", "route_policy_inheritance_child_override_ignore.yaml", ""),
 	XEntry("RoutePolicy merge child override on no conflict", "route_policy_inheritance_child_override_ok.yaml", ""),
 	XEntry("RoutePolicy multi level inheritance with child override", "route_policy_multi_level_inheritance_override_ok.yaml", ""),
