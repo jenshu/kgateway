@@ -22,22 +22,6 @@ spec:
       name: "*"
       namespace: a
 ---
-apiVersion: gateway.solo.io/v1
-kind: RouteOption
-metadata:
-  name: example-opt
-  namespace: infra
-spec:
-  targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: example-route
-  options:
-    faults:
-      abort:
-        percentage: 100
-        httpStatus: 418
----
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -53,18 +37,38 @@ spec:
     - name: svc-a
       port: 8080
 ---
-apiVersion: gateway.solo.io/v1
-kind: RouteOption
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
 metadata:
-  name: route-a-opt
+  name: example-policy
+  namespace: infra
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: example-route
+  transformation:
+    response:
+      add:
+      - name: abc
+        value: custom-value-abc
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
+metadata:
+  name: route-a-policy
   namespace: a
 spec:
   targetRefs:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: route-a
-  options:
-    faults:
-      abort:
-        percentage: 80
-        httpStatus: 404
+  transformation:
+    request:
+      set:
+        - name: x-foo-req
+          value: abc
+    response:
+      set:
+        - name: x-foo-resp
+          value: xyz
