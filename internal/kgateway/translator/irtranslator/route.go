@@ -132,7 +132,7 @@ func (h *httpRouteConfigurationTranslator) envoyRoutes(ctx context.Context,
 	}
 
 	// Set timeout from the HTTPRouteRule if specified
-	if in.Timeouts != nil && in.Timeouts.Request != nil {
+	if in.Timeouts != nil && in.Timeouts.Request != nil && out.GetAction() != nil {
 		applyRouteTimeout(ctx, out, in.Timeouts.Request)
 	}
 
