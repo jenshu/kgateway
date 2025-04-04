@@ -112,6 +112,15 @@ func filterDelegatedChildren(
 	return selected
 }
 
+// isDelegatedRouteMatch is called only when inherit-parent-matcher is not set.
+// It returns true if the child is a valid delegatee of the parent. This will be true if
+// the following conditions are met:
+// - if child sets parentRefs, the parentRefs must include the parent
+// - the parent path matcher must be of type PathPrefix
+// - the parent path matcher value must be a prefix of the child path matcher value
+// - the child header matchers must be a superset of the parent header matchers
+// - the child query param matchers must be a superset of the parent query param matchers
+// - if the parent method matcher is set, the child's method matcher value must be equal to the parent method matcher value
 func isDelegatedRouteMatch(
 	parent gwv1.HTTPRouteMatch,
 	parentRef types.NamespacedName,
@@ -167,7 +176,7 @@ func isDelegatedRouteMatch(
 		}
 	}
 
-	// Validate that the child query parameters are a superset of the parent headers
+	// Validate that the child query parameters are a superset of the parent query parameters
 	for _, parentQuery := range parent.QueryParams {
 		found := false
 		for _, childQuery := range child.QueryParams {
@@ -205,7 +214,14 @@ func shouldInheritMatcher(route *ir.HttpRouteIR) bool {
 	}
 }
 
-// mergeParentChildRouteMatch merges the parent route match into the child.
+// mergeParentChildRouteMatch is called only when inherit-parent-matcher is set.
+// It merges the parent route match into the child as follows:
+//   - the resulting path consists of parent path + child path
+//   - the resulting headers consist of the combined headers from parent and child, with parent header taking
+//     precedence on any name conflicts
+//   - the resulting query parameters consist of the combined query parameters from parent and child, with parent
+//     query params taking precedence on any name conflicts
+//   - the child inherits the parent's method if specified; otherwise the child retains its own method
 func mergeParentChildRouteMatch(
 	parent *gwv1.HTTPRouteMatch,
 	child *gwv1.HTTPRouteMatch,
@@ -227,12 +243,14 @@ func mergeParentChildRouteMatch(
 	child.Headers = mergeHeaders(parent.Headers, child.Headers)
 	child.QueryParams = mergeQueries(parent.QueryParams, child.QueryParams)
 
-	// If parent specifies a method, inherit it
+	// If parent specifies a method, inherit it (this will overwrite any method specified on the child)
 	if parent.Method != nil {
 		child.Method = ptr.To(*parent.Method)
 	}
 }
 
+// mergeHeaders merges parent and child header matches. If a header name is specified on both
+// the parent and child, the parent's header value takes precedence (i.e. child cannot overwrite it).
 func mergeHeaders(
 	parent, child []gwv1.HTTPHeaderMatch,
 ) []gwv1.HTTPHeaderMatch {
@@ -258,6 +276,8 @@ func mergeHeaders(
 	return result
 }
 
+// mergeQueries merges parent and child query param matches. If a query param name is specified on both
+// the parent and child, the parent's query param value takes precedence (i.e. child cannot overwrite it).
 func mergeQueries(
 	parent, child []gwv1.HTTPQueryParamMatch,
 ) []gwv1.HTTPQueryParamMatch {
