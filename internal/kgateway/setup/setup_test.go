@@ -115,12 +115,37 @@ func init() {
 }
 
 func TestServiceEntry(t *testing.T) {
+	t.Run("no DR plugin", func(t *testing.T) {
+		st, err := settings.BuildSettings()
+		if err != nil {
+			t.Fatalf("can't get settings %v", err)
+		}
+		st.EnableIstioIntegration = false
+		runScenario(t, "testdata/serviceentry", st)
+	})
+
+	t.Run("DR plugin enabled", func(t *testing.T) {
+		st, err := settings.BuildSettings()
+		if err != nil {
+			t.Fatalf("can't get settings %v", err)
+		}
+		st.EnableIstioIntegration = true
+
+		// // we can re-run these with the plugin on and expect nothing to change
+		// runScenario(t, "testdata/serviceentry", st)
+
+		// these exercise applying a DR to a ServiceEntry
+		runScenario(t, "testdata/serviceentry/dr", st)
+	})
+}
+
+func TestDestinationRule(t *testing.T) {
 	st, err := settings.BuildSettings()
+	st.EnableIstioIntegration = true
 	if err != nil {
 		t.Fatalf("can't get settings %v", err)
 	}
-
-	runScenario(t, "testdata/serviceentry", st)
+	runScenario(t, "testdata/istio_destination_rule", st)
 }
 
 func TestWithStandardSettings(t *testing.T) {
@@ -129,6 +154,16 @@ func TestWithStandardSettings(t *testing.T) {
 		t.Fatalf("can't get settings %v", err)
 	}
 	runScenario(t, "testdata/standard", st)
+}
+
+func TestWithIstioAutomtlsSettings(t *testing.T) {
+	st, err := settings.BuildSettings()
+	st.EnableIstioIntegration = true
+	st.EnableIstioAutoMtls = true
+	if err != nil {
+		t.Fatalf("can't get settings %v", err)
+	}
+	runScenario(t, "testdata/istio_mtls", st)
 }
 
 func TestWithAutoDns(t *testing.T) {
@@ -141,17 +176,15 @@ func TestWithAutoDns(t *testing.T) {
 	runScenario(t, "testdata/autodns", st)
 }
 
-func TestScenarios(t *testing.T) {
+func TestWithInferenceAPI(t *testing.T) {
 	st, err := settings.BuildSettings()
 	if err != nil {
 		t.Fatalf("can't get settings %v", err)
 	}
-	st.EnableIstioIntegration = true
-	st.EnableIstioAutoMtls = true
 	st.EnableInferExt = true
 	st.InferExtAutoProvision = true
 
-	runScenario(t, "testdata", st)
+	runScenario(t, "testdata/inference_api", st)
 }
 
 func policyFile() string {
@@ -339,7 +372,7 @@ func setupEnvTestAndRun(t *testing.T, globalSettings *settings.Settings, run fun
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "crds"),
 			filepath.Join("..", "..", "..", "install", "helm", "kgateway-crds", "templates"),
-			filepath.Join("testdata", "istiocrds"),
+			filepath.Join("testdata", "istio_crds_setup"),
 		},
 		ErrorIfCRDPathMissing: true,
 		// set assets dir so we can run without the makefile
@@ -372,7 +405,7 @@ func setupEnvTestAndRun(t *testing.T, globalSettings *settings.Settings, run fun
 	}
 
 	// apply settings/gwclass to the cluster
-	err = client.ApplyYAMLFiles("default", "testdata/setupyaml/setup.yaml")
+	err = client.ApplyYAMLFiles("default", "testdata/setup_yaml/setup.yaml")
 	if err != nil {
 		t.Fatalf("failed to apply yaml: %v", err)
 	}
@@ -383,11 +416,11 @@ func setupEnvTestAndRun(t *testing.T, globalSettings *settings.Settings, run fun
 		t.Fatalf("failed to create namespace: %v", err)
 	}
 
-	err = client.ApplyYAMLFiles("gwtest", "testdata/setupyaml/pods.yaml")
+	err = client.ApplyYAMLFiles("gwtest", "testdata/setup_yaml/pods.yaml")
 	if err != nil {
 		t.Fatalf("failed to apply yaml: %v", err)
 	}
-	err = applyPodStatusFromFile(ctx, client, "gwtest", "testdata/setupyaml/pods.yaml")
+	err = applyPodStatusFromFile(ctx, client, "gwtest", "testdata/setup_yaml/pods.yaml")
 	if err != nil {
 		t.Fatalf("failed to apply pod status: %v", err)
 	}
@@ -832,6 +865,9 @@ func (x *xdsDump) Compare(other xdsDump) error {
 
 func compareCla(c, otherc *envoyendpoint.ClusterLoadAssignment) error {
 	if (c == nil) != (otherc == nil) {
+		if c == nil {
+			return fmt.Errorf("cluster is nil")
+		}
 		return fmt.Errorf("ep %v not found", c.ClusterName)
 	}
 	if c == nil || otherc == nil {

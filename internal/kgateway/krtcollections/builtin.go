@@ -3,10 +3,14 @@ package krtcollections
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	envoyhttp "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
+	"github.com/hashicorp/go-multierror"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 	"istio.io/istio/pkg/kube/krt"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/utils/ptr"
@@ -18,22 +22,21 @@ import (
 	envoytype "github.com/envoyproxy/go-control-plane/envoy/type/v3"
 	gwv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	extensionplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
 	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/plugins"
 )
 
-var (
-	VirtualBuiltInGK = schema.GroupKind{
-		Group: "builtin",
-		Kind:  "builtin",
-	}
-)
+var VirtualBuiltInGK = schema.GroupKind{
+	Group: "builtin",
+	Kind:  "builtin",
+}
 
 type builtinPlugin struct {
-	spec     gwv1.HTTPRouteFilter
-	mutation func(in ir.HttpRouteRuleMatchIR, outputRoute *envoy_config_route_v3.Route) error
+	spec           gwv1.HTTPRouteFilter
+	ruleSpec       gwv1.HTTPRouteRule
+	filterMutation func(in ir.HttpRouteRuleMatchIR, outputRoute *envoy_config_route_v3.Route) error
+	ruleMutation   func(in ir.HttpRouteRuleMatchIR, outputRoute *envoy_config_route_v3.Route) error
 }
 
 func (d *builtinPlugin) CreationTime() time.Time {
@@ -63,16 +66,27 @@ func (p *builtinPluginGwPass) ApplyHCM(ctx context.Context, pCtx *ir.HcmContext,
 
 func NewBuiltInIr(kctx krt.HandlerContext, f gwv1.HTTPRouteFilter, fromgk schema.GroupKind, fromns string, refgrants *RefGrantIndex, ups *BackendIndex) ir.PolicyIR {
 	return &builtinPlugin{
-		spec:     f,
-		mutation: convert(kctx, f, fromgk, fromns, refgrants, ups),
+		spec:           f,
+		filterMutation: convert(kctx, f, fromgk, fromns, refgrants, ups),
 	}
 }
 
-func NewBuiltinPlugin(ctx context.Context) extensionplug.Plugin {
-	return extensionplug.Plugin{
+func NewBuiltInRuleIr(rule gwv1.HTTPRouteRule) ir.PolicyIR {
+	// If no rule policies are set, return nil so that we don't have a no-op policy
+	if rule.Timeouts == nil && rule.Retry == nil {
+		return nil
+	}
+	return &builtinPlugin{
+		ruleSpec:     rule,
+		ruleMutation: convertRule(rule),
+	}
+}
+
+func NewBuiltinPlugin(ctx context.Context) extensionsplug.Plugin {
+	return extensionsplug.Plugin{
 		ContributesPolicies: map[schema.GroupKind]extensionsplug.PolicyPlugin{
 			VirtualBuiltInGK: {
-				//AttachmentPoints: []ir.AttachmentPoints{ir.HttpAttachmentPoint},
+				// AttachmentPoints: []ir.AttachmentPoints{ir.HttpAttachmentPoint},
 				NewGatewayTranslationPass: NewGatewayTranslationPass,
 			},
 		},
@@ -94,6 +108,117 @@ func convert(kctx krt.HandlerContext, f gwv1.HTTPRouteFilter, fromgk schema.Grou
 	}
 	return nil
 }
+
+func formatRuleError(action string, ruleIR ir.HttpRouteRuleMatchIR, err error) error {
+	if ruleIR.Name != "" {
+		return fmt.Errorf("failed to apply HTTPRoute %s for route %s/%s (rule: %s): %w", action, string(*ruleIR.ParentRef.Namespace), ruleIR.ParentRef.Name, ruleIR.Name, err)
+	}
+	return fmt.Errorf("failed to apply HTTPRoute %s for route %s/%s: %w", action, string(*ruleIR.ParentRef.Namespace), ruleIR.ParentRef.Name, err)
+}
+
+func convertRule(rule gwv1.HTTPRouteRule) func(in ir.HttpRouteRuleMatchIR, outputRoute *envoy_config_route_v3.Route) error {
+	return func(ruleIR ir.HttpRouteRuleMatchIR, outputRoute *envoy_config_route_v3.Route) error {
+		// A parent route rule with a delegated backend will not have outputRoute.RouteAction set
+		// but the plugin will be invoked on the rule, so treat this as a no-op call
+		if outputRoute == nil || outputRoute.GetRoute() == nil {
+			return nil
+		}
+
+		err := applyTimeout(outputRoute, rule.Timeouts, rule.Retry != nil)
+		if err != nil {
+			return formatRuleError("timeout", ruleIR, err)
+		}
+
+		err = applyRetry(outputRoute, rule.Retry, rule.Timeouts)
+		if err != nil {
+			return formatRuleError("retry", ruleIR, err)
+		}
+		return nil
+	}
+}
+
+func applyTimeout(route *envoy_config_route_v3.Route, timeout *gwv1.HTTPRouteTimeouts, hasRetry bool) error {
+	if timeout == nil {
+		return nil
+	}
+
+	var timeoutStr string
+	// Apply the required timeout selection logic
+	switch {
+	case timeout.BackendRequest != nil && timeout.Request != nil:
+		// When both timeouts are set:
+		// - Without retry: Use BackendRequest, since it's more specific (shorter)
+		// - With retry: Use Request as the overall route timeout since
+		//   BackendRequest will be applied to each retry attempt
+		if hasRetry {
+			timeoutStr = string(*timeout.Request)
+		} else {
+			timeoutStr = string(*timeout.BackendRequest)
+		}
+	case timeout.BackendRequest != nil:
+		// Only BackendRequest is set
+		timeoutStr = string(*timeout.BackendRequest)
+	case timeout.Request != nil:
+		// Only Request is set
+		timeoutStr = string(*timeout.Request)
+	default:
+		return nil
+	}
+
+	duration, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		return fmt.Errorf("invalid HTTPRoute timeout %s: %w", timeoutStr, err)
+	}
+	route.GetRoute().Timeout = durationpb.New(duration)
+	return nil
+}
+
+func applyRetry(route *envoy_config_route_v3.Route, retry *gwv1.HTTPRouteRetry, timeout *gwv1.HTTPRouteTimeouts) error {
+	if retry == nil {
+		return nil
+	}
+
+	retryPolicy := &envoy_config_route_v3.RetryPolicy{
+		NumRetries: &wrapperspb.UInt32Value{Value: 1},
+		RetryOn:    "cancelled,connect-failure,refused-stream,retriable-headers,retriable-status-codes,unavailable",
+	}
+
+	if retry.Attempts != nil {
+		retryPolicy.NumRetries = &wrapperspb.UInt32Value{Value: uint32(*retry.Attempts)}
+	}
+
+	if len(retry.Codes) > 0 {
+		retryPolicy.RetriableStatusCodes = make([]uint32, len(retry.Codes))
+		for i, c := range retry.Codes {
+			retryPolicy.GetRetriableStatusCodes()[i] = uint32(c)
+		}
+	}
+
+	if retry.Backoff != nil {
+		backoff, err := time.ParseDuration(string(*retry.Backoff))
+		if err != nil {
+			return fmt.Errorf("invalid HTTPRoute retry backoff %s: %w", *retry.Backoff, err)
+		}
+		retryPolicy.RetryBackOff = &envoy_config_route_v3.RetryPolicy_RetryBackOff{
+			BaseInterval: durationpb.New(backoff),
+		}
+	}
+
+	// If a backend request timeout is set, use it as the per-try timeout.
+	// Otherwise, Envoy will by default use the global route timeout
+	// Refer to https://gateway-api.sigs.k8s.io/geps/gep-1742/
+	if timeout != nil && timeout.BackendRequest != nil {
+		timeoutDuration, err := time.ParseDuration(string(*timeout.BackendRequest))
+		if err != nil {
+			return fmt.Errorf("invalid HTTPRoute backend request timeout %s: %w", *timeout.BackendRequest, err)
+		}
+		retryPolicy.PerTryTimeout = durationpb.New(timeoutDuration)
+	}
+
+	route.GetRoute().RetryPolicy = retryPolicy
+	return nil
+}
+
 func convertURLRewrite(kctx krt.HandlerContext, config *gwv1.HTTPURLRewriteFilter) func(in ir.HttpRouteRuleMatchIR, outputRoute *envoy_config_route_v3.Route) error {
 	if config == nil {
 		return func(in ir.HttpRouteRuleMatchIR, outputRoute *envoy_config_route_v3.Route) error {
@@ -123,7 +248,7 @@ func convertURLRewrite(kctx krt.HandlerContext, config *gwv1.HTTPURLRewriteFilte
 
 	return func(in ir.HttpRouteRuleMatchIR, outputRoute *envoy_config_route_v3.Route) error {
 		if outputRoute.GetRoute() == nil {
-			if in.HasChildren {
+			if in.Delegates {
 				// if route has children, it's a delegate route, and we don't need to return an error
 				// as this might need to apply to children.
 				return nil
@@ -211,6 +336,7 @@ func translatePathRewrite(outputRoute *envoy_config_route_v3.RedirectAction, pat
 		}
 	}
 }
+
 func translateScheme(out *envoy_config_route_v3.RedirectAction, scheme *string) {
 	if scheme == nil {
 		return
@@ -236,6 +362,7 @@ func translateHostname(hostname *gwv1.PreciseHostname) string {
 	}
 	return string(*hostname)
 }
+
 func translateStatusCode(i *int) envoy_config_route_v3.RedirectAction_RedirectResponseCode {
 	if i == nil {
 		return envoy_config_route_v3.RedirectAction_FOUND
@@ -387,6 +514,7 @@ func toEnvoyPercentage(percentage float64) *envoytype.FractionalPercent {
 func NewGatewayTranslationPass(ctx context.Context, tctx ir.GwTranslationCtx) ir.ProxyTranslationPass {
 	return &builtinPluginGwPass{}
 }
+
 func (p *builtinPlugin) Name() string {
 	return "builtin"
 }
@@ -398,19 +526,27 @@ func (p *builtinPluginGwPass) ApplyListenerPlugin(ctx context.Context, pCtx *ir.
 func (p *builtinPluginGwPass) ApplyVhostPlugin(ctx context.Context, pCtx *ir.VirtualHostContext, out *envoy_config_route_v3.VirtualHost) {
 }
 
-// called 0 or more times
+// called one or more times per route rule
 func (p *builtinPluginGwPass) ApplyForRoute(ctx context.Context, pCtx *ir.RouteContext, outputRoute *envoy_config_route_v3.Route) error {
 	policy, ok := pCtx.Policy.(*builtinPlugin)
 	if !ok {
 		return nil
 	}
 
-	if policy.mutation == nil {
-		// TODO: report error
-		return nil
+	var errs *multierror.Error
+	if policy.filterMutation != nil {
+		if err := policy.filterMutation(pCtx.In, outputRoute); err != nil {
+			errs = multierror.Append(errs, err)
+		}
 	}
 
-	return policy.mutation(pCtx.In, outputRoute)
+	if policy.ruleMutation != nil {
+		if err := policy.ruleMutation(pCtx.In, outputRoute); err != nil {
+			errs = multierror.Append(errs, err)
+		}
+	}
+
+	return errs.ErrorOrNil()
 }
 
 func (p *builtinPluginGwPass) ApplyForRouteBackend(

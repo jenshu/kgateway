@@ -24,6 +24,7 @@ import (
 	networkingclient "istio.io/client-go/pkg/apis/networking/v1"
 	"istio.io/istio/pkg/maps"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,17 +45,26 @@ func serviceEntryKey(obj ir.Namespaced) string {
 	return obj.GetNamespace() + "/" + obj.GetName()
 }
 
-// hostPortKey attempts to ensure usage of makeHostPortKey for querying
-// indexes of backend by host and port.
-type hostPortKey string
+// backendKey uniquely identifies a Backend resource.
+// It can be identified either by host/port combination OR by source object reference.
+// When used for indexing, both identifiers will be added to the index.
+type backendKey struct {
+	host string
+	port int32
 
-func (h hostPortKey) String() string {
-	return string(h)
+	srcObj string
 }
 
-// makeHostPortKey keys backends on the host and port.
-func makeHostPortKey(host string, port int) hostPortKey {
-	return hostPortKey(host + "/" + strconv.Itoa(port))
+func makeHostPortKey(host string, port int32) backendKey {
+	return backendKey{host: host, port: port}
+}
+
+func makeSrcObjKey(obj ir.ObjectSource) backendKey {
+	return backendKey{srcObj: serviceEntryKey(obj)}
+}
+
+func (h backendKey) String() string {
+	return h.host + ":" + strconv.Itoa(int(h.port)) + "~" + h.srcObj
 }
 
 func (s seSelector) ResourceName() string {
@@ -114,7 +124,7 @@ func (sw selectedWorkload) Equals(o selectedWorkload) bool {
 		maps.Equal(sw.portMapping, o.portMapping)
 }
 
-type serviceEntryCollections struct {
+type serviceEntryPlugin struct {
 	logger *zap.SugaredLogger
 
 	// core inputs
@@ -127,16 +137,15 @@ type serviceEntryCollections struct {
 	selectedWorkloadsIndex  krt.Index[string, selectedWorkload]
 
 	// output collections
-	Backends            krt.Collection[ir.BackendObjectIR]
-	Endpoints           krt.Collection[ir.EndpointsForBackend]
-	backendsByHostPort  krt.Index[hostPortKey, ir.BackendObjectIR]
-	backendsBySourceObj krt.Index[string, ir.BackendObjectIR]
+	Backends      krt.Collection[ir.BackendObjectIR]
+	Endpoints     krt.Collection[ir.EndpointsForBackend]
+	backendsIndex krt.Index[backendKey, ir.BackendObjectIR]
 }
 
 func initServiceEntryCollections(
 	ctx context.Context,
 	commonCols *common.CommonCollections,
-) serviceEntryCollections {
+) serviceEntryPlugin {
 	logger := contextutils.LoggerFrom(ctx).Named("serviceentry")
 
 	// setup input collections
@@ -163,15 +172,14 @@ func initServiceEntryCollections(
 	// init the outputs
 	Backends := backendsCollections(logger, commonCols.ServiceEntries, commonCols.KrtOpts)
 	Endpoints := endpointsCollection(Backends, SelectedWorkloads, selectedWorkloadsIndex, commonCols.KrtOpts)
-	backendsByHostPort := krt.NewIndex(Backends, func(be ir.BackendObjectIR) []hostPortKey {
-		return []hostPortKey{makeHostPortKey(be.CanonicalHostname, int(be.Port))}
-	})
-	// TODO this is part of the hackaround for SE backends being se*hosts*ports.
-	backendsBySourceObj := krt.NewIndex(Backends, func(be ir.BackendObjectIR) []string {
-		return []string{serviceEntryKey(be.ObjectSource)}
+	backendsIndex := krt.NewIndex(Backends, func(be ir.BackendObjectIR) []backendKey {
+		return []backendKey{
+			makeHostPortKey(be.CanonicalHostname, be.Port),
+			makeSrcObjKey(be.ObjectSource),
+		}
 	})
 
-	return serviceEntryCollections{
+	return serviceEntryPlugin{
 		logger: contextutils.LoggerFrom(ctx),
 
 		ServiceEntries:  commonCols.ServiceEntries,
@@ -181,14 +189,13 @@ func initServiceEntryCollections(
 		SelectedWorkloads:       SelectedWorkloads,
 		selectedWorkloadsIndex:  selectedWorkloadsIndex,
 
-		Backends:            Backends,
-		Endpoints:           Endpoints,
-		backendsByHostPort:  backendsByHostPort,
-		backendsBySourceObj: backendsBySourceObj,
+		Backends:      Backends,
+		Endpoints:     Endpoints,
+		backendsIndex: backendsIndex,
 	}
 }
 
-func (s *serviceEntryCollections) HasSynced() bool {
+func (s *serviceEntryPlugin) HasSynced() bool {
 	if s == nil {
 		return false
 	}
@@ -279,7 +286,10 @@ func selectedWorkloadFromEntry(
 	weSpec *networking.WorkloadEntry,
 	selectedBy []seSelector,
 ) selectedWorkload {
-	labels := weSpec.GetLabels()
+	labels := maps.Clone(weSpec.GetLabels())
+	if labels == nil {
+		labels = map[string]string{}
+	}
 	if metadataLabels != nil {
 		// WorkloadEntry has two places to specify labels.
 		// Merge the spec labels on top of the metadata ones
@@ -292,6 +302,20 @@ func selectedWorkloadFromEntry(
 		network = labels[label.TopologyNetwork.Name]
 	}
 
+	// TODO inline endpoints don't get correct priority unless we copy
+	// the locality into labels; investigate prioritize logic to ensure
+	// we rely directly on PodLocality struct
+	locality := getLocality(weSpec.GetLocality(), labels)
+	if locality.Region != "" {
+		labels[corev1.LabelTopologyRegion] = locality.Region
+	}
+	if locality.Zone != "" {
+		labels[corev1.LabelTopologyZone] = locality.Zone
+	}
+	if locality.Subzone != "" {
+		labels[label.TopologySubzone.Name] = locality.Subzone
+	}
+
 	return selectedWorkload{
 		selectedBy: slices.Map(selectedBy, func(se seSelector) krt.Named {
 			return krt.NewNamed(se)
@@ -301,7 +325,7 @@ func selectedWorkloadFromEntry(
 				Name:      name,
 				Namespace: namespace,
 			},
-			Locality:        getLocality(weSpec.GetLocality(), labels),
+			Locality:        locality,
 			AugmentedLabels: labels,
 			Addresses:       []string{weSpec.GetAddress()},
 		},

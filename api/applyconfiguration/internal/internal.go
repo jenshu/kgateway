@@ -437,33 +437,17 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ExtAuthPolicy
   map:
     fields:
-    - name: clearRouteCache
+    - name: contextExtensions
       type:
-        scalar: boolean
-    - name: emitFilterStateStats
-      type:
-        scalar: boolean
+        map:
+          elementType:
+            scalar: string
     - name: enablement
       type:
         scalar: string
     - name: extensionRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: failureModeAllow
-      type:
-        scalar: boolean
-    - name: includePeerCertificate
-      type:
-        scalar: boolean
-    - name: includeTLSSession
-      type:
-        scalar: boolean
-    - name: metadataContextNamespaces
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: associative
     - name: withRequestBody
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.BufferSettings
@@ -488,9 +472,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: extensionRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: failureModeAllow
-      type:
-        scalar: boolean
     - name: processingMode
       type:
         namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.ProcessingMode
@@ -764,6 +745,9 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
+    - name: insecureSkipVerify
+      type:
+        scalar: boolean
     - name: port
       type:
         scalar: numeric
@@ -970,6 +954,16 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.Toleration
           elementRelationship: atomic
+- name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Port
+  map:
+    fields:
+    - name: nodePort
+      type:
+        scalar: numeric
+    - name: port
+      type:
+        scalar: numeric
+      default: 0
 - name: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Priority
   map:
     fields:
@@ -1121,6 +1115,12 @@ var schemaYAML = typed.YAMLObject(`types:
         map:
           elementType:
             scalar: string
+    - name: ports
+      type:
+        list:
+          elementType:
+            namedType: com.github.kgateway-dev.kgateway.v2.api.v1alpha1.Port
+          elementRelationship: atomic
     - name: type
       type:
         scalar: string

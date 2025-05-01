@@ -13,6 +13,8 @@ import (
 	gwv1a2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
 	gwv1beta1 "sigs.k8s.io/gateway-api/apis/v1beta1"
 
+	apiannotations "github.com/kgateway-dev/kgateway/v2/api/annotations"
+	apilabels "github.com/kgateway-dev/kgateway/v2/api/labels"
 	extensionsplug "github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/plugin"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/ir"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/translator/backendref"
@@ -208,6 +210,23 @@ func (k targetRefIndexKey) String() string {
 	return fmt.Sprintf("%s/%s/%s/%s", k.Group, k.Kind, k.Name, k.Namespace)
 }
 
+// HTTPRouteSelector is used to lookup HttpRouteIR using one of the following ways:
+// - Only LabelValue
+// - Only Namespace
+// - LabelValue + Namespace
+type HTTPRouteSelector struct {
+	// LabelValue is the value of the HTTPRouteSelector label.
+	// +optional
+	LabelValue string
+	// Namespace is to fetch routes from.
+	// +optional
+	Namespace string
+}
+
+func (k HTTPRouteSelector) String() string {
+	return fmt.Sprintf("%s/%s", k.LabelValue, k.Namespace)
+}
+
 type globalPolicy struct {
 	schema.GroupKind
 	ir     func(krt.HandlerContext, extensionsplug.AttachmentPoints) ir.PolicyIR
@@ -295,6 +314,7 @@ func NewPolicyIndex(krtopts krtutil.KrtOptions, contributesPolicies extensionspl
 
 	return index
 }
+
 func (p *PolicyIndex) fetchByTargetRef(
 	kctx krt.HandlerContext,
 	targetRef targetRefIndexKey,
@@ -522,10 +542,10 @@ func (c RouteWrapper) Equals(in RouteWrapper) bool {
 // MARK: RoutesIndex
 
 type RoutesIndex struct {
-	routes          krt.Collection[RouteWrapper]
-	httpRoutes      krt.Collection[ir.HttpRouteIR]
-	httpByNamespace krt.Index[string, ir.HttpRouteIR]
-	byParentRef     krt.Index[targetRefIndexKey, RouteWrapper]
+	routes         krt.Collection[RouteWrapper]
+	httpRoutes     krt.Collection[ir.HttpRouteIR]
+	httpBySelector krt.Index[HTTPRouteSelector, ir.HttpRouteIR]
+	byParentRef    krt.Index[targetRefIndexKey, RouteWrapper]
 
 	policies  *PolicyIndex
 	refgrants *RefGrantIndex
@@ -569,9 +589,25 @@ func NewRoutesIndex(
 
 	h.routes = krt.JoinCollection([]krt.Collection[RouteWrapper]{httpRouteCollection, tcpRoutesCollection, tlsRoutesCollection}, krtopts.ToOptions("all-routes-with-policy")...)
 
-	httpByNamespace := krt.NewIndex(h.httpRoutes, func(i ir.HttpRouteIR) []string {
-		return []string{i.GetNamespace()}
+	httpBySelector := krt.NewIndex(h.httpRoutes, func(i ir.HttpRouteIR) []HTTPRouteSelector {
+		value, ok := i.SourceObject.GetLabels()[apilabels.DelegationLabelSelector]
+		if !ok {
+			return []HTTPRouteSelector{
+				// Key for wildcard namespace Fetch
+				{Namespace: i.GetNamespace()},
+			}
+		}
+		return []HTTPRouteSelector{
+			// Key for namespace only Fetch
+			{Namespace: i.GetNamespace()},
+			// Key for label+namespace Fetch
+			{LabelValue: value, Namespace: i.GetNamespace()},
+			// Key for label only Fetch
+			{LabelValue: value},
+		}
 	})
+	h.httpBySelector = httpBySelector
+
 	byParentRef := krt.NewIndex(h.routes, func(in RouteWrapper) []targetRefIndexKey {
 		parentRefs := in.Route.GetParentRefs()
 		ret := make([]targetRefIndexKey, len(parentRefs))
@@ -602,13 +638,13 @@ func NewRoutesIndex(
 		}
 		return ret
 	})
-	h.httpByNamespace = httpByNamespace
 	h.byParentRef = byParentRef
+
 	return h
 }
 
-func (h *RoutesIndex) FetchHttpNamespace(kctx krt.HandlerContext, ns string) []ir.HttpRouteIR {
-	return krt.Fetch(kctx, h.httpRoutes, krt.FilterIndex(h.httpByNamespace, ns))
+func (h *RoutesIndex) FetchHTTPRoutesBySelector(kctx krt.HandlerContext, selector HTTPRouteSelector) []ir.HttpRouteIR {
+	return krt.Fetch(kctx, h.httpRoutes, krt.FilterIndex(h.httpBySelector, selector))
 }
 
 func (h *RoutesIndex) RoutesForGateway(kctx krt.HandlerContext, nns types.NamespacedName) []ir.Route {
@@ -701,13 +737,19 @@ func (h *RoutesIndex) transformHttpRoute(kctx krt.HandlerContext, i *gwv1.HTTPRo
 		Name:      i.Name,
 	}
 
+	delegationInheritedPolicyPriority := apiannotations.DelegationInheritedPolicyPriorityValue(i.Annotations[apiannotations.DelegationInheritedPolicyPriority])
+
 	return &ir.HttpRouteIR{
-		ObjectSource:     src,
-		SourceObject:     i,
-		ParentRefs:       i.Spec.ParentRefs,
-		Hostnames:        tostr(i.Spec.Hostnames),
-		Rules:            h.transformRules(kctx, src, i.Spec.Rules),
-		AttachedPolicies: toAttachedPolicies(h.policies.getTargetingPolicies(kctx, extensionsplug.RouteAttachmentPoint, src, "")),
+		ObjectSource: src,
+		SourceObject: i,
+		ParentRefs:   i.Spec.ParentRefs,
+		Hostnames:    tostr(i.Spec.Hostnames),
+		Rules: h.transformRules(
+			kctx, src, i.Spec.Rules, ir.WithDelegationInheritedPolicyPriority(delegationInheritedPolicyPriority)),
+		AttachedPolicies: toAttachedPolicies(
+			h.policies.getTargetingPolicies(kctx, extensionsplug.RouteAttachmentPoint, src, ""),
+			ir.WithDelegationInheritedPolicyPriority(delegationInheritedPolicyPriority),
+		),
 	}
 }
 
@@ -715,14 +757,17 @@ func (h *RoutesIndex) transformRules(
 	kctx krt.HandlerContext,
 	src ir.ObjectSource,
 	i []gwv1.HTTPRouteRule,
+	opts ...ir.PolicyAttachmentOpts,
 ) []ir.HttpRouteRuleIR {
 	rules := make([]ir.HttpRouteRuleIR, 0, len(i))
 	for _, r := range i {
 		extensionRefs := h.getExtensionRefs(kctx, src.Namespace, r.Filters)
 		var policies ir.AttachedPolicies
 		if r.Name != nil {
-			policies = toAttachedPolicies(h.policies.getTargetingPolicies(kctx, extensionsplug.RouteAttachmentPoint, src, string(*r.Name)))
+			policies = toAttachedPolicies(h.policies.getTargetingPolicies(kctx, extensionsplug.RouteAttachmentPoint, src, string(*r.Name)), opts...)
 		}
+		rulePolicies := h.getBuiltInRulePolicies(r)
+		policies.Append(rulePolicies)
 
 		rules = append(rules, ir.HttpRouteRuleIR{
 			ExtensionRefs:    extensionRefs,
@@ -730,7 +775,6 @@ func (h *RoutesIndex) transformRules(
 			Backends:         h.getBackends(kctx, src, r.BackendRefs),
 			Matches:          r.Matches,
 			Name:             emptyIfNil(r.Name),
-			Timeouts:         r.Timeouts,
 		})
 	}
 	return rules
@@ -746,6 +790,17 @@ func (h *RoutesIndex) getExtensionRefs(kctx krt.HandlerContext, ns string, r []g
 		if policy != nil {
 			ret.Policies[gk] = append(ret.Policies[gk], ir.PolicyAtt{PolicyIr: policy /*direct attachment - no target ref*/})
 		}
+	}
+	return ret
+}
+
+func (h *RoutesIndex) getBuiltInRulePolicies(rule gwv1.HTTPRouteRule) ir.AttachedPolicies {
+	ret := ir.AttachedPolicies{
+		Policies: map[schema.GroupKind][]ir.PolicyAtt{},
+	}
+	policy := NewBuiltInRuleIr(rule)
+	if policy != nil {
+		ret.Policies[VirtualBuiltInGK] = append(ret.Policies[VirtualBuiltInGK], ir.PolicyAtt{PolicyIr: policy /*direct attachment - no target ref*/})
 	}
 	return ret
 }
@@ -800,7 +855,7 @@ func (h *RoutesIndex) getBackends(kctx krt.HandlerContext, src ir.ObjectSource, 
 		fromns := src.Namespace
 
 		to := toFromBackendRef(fromns, ref.BackendObjectReference)
-		if backendref.RefIsHTTPRoute(ref.BackendRef.BackendObjectReference) {
+		if backendref.IsDelegatedHTTPRoute(ref.BackendRef.BackendObjectReference) {
 			backends = append(backends, ir.HttpBackendOrDelegate{
 				Delegate:         &to,
 				AttachedPolicies: extensionRefs,
@@ -867,7 +922,7 @@ func weight(w *int32) uint32 {
 	return uint32(*w)
 }
 
-func toAttachedPolicies(policies []ir.PolicyAtt) ir.AttachedPolicies {
+func toAttachedPolicies(policies []ir.PolicyAtt, opts ...ir.PolicyAttachmentOpts) ir.AttachedPolicies {
 	ret := ir.AttachedPolicies{
 		Policies: map[schema.GroupKind][]ir.PolicyAtt{},
 	}
@@ -876,12 +931,16 @@ func toAttachedPolicies(policies []ir.PolicyAtt) ir.AttachedPolicies {
 			Group: p.GroupKind.Group,
 			Kind:  p.GroupKind.Kind,
 		}
-		// TODO: do not create a new PolicyAtt, just use existing `p`
+		// Create a new PolicyAtt instead of using `p` because the PolicyAttchmentOpts are per-route
+		// and not encoded in `p`
 		polAtt := ir.PolicyAtt{
 			PolicyIr:  p.PolicyIr,
 			PolicyRef: p.PolicyRef,
 			GroupKind: gk,
 			Errors:    p.Errors,
+		}
+		for _, o := range opts {
+			o(&polAtt)
 		}
 		ret.Policies[gk] = append(ret.Policies[gk], polAtt)
 	}

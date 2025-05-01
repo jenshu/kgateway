@@ -244,17 +244,17 @@ func getAISecretRef(llm v1alpha1.SupportedLLMProvider) *corev1.LocalObjectRefere
 	return secretRef
 }
 
-func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_config_cluster_v3.Cluster) {
+func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_config_cluster_v3.Cluster) *ir.EndpointsForBackend {
 	log := contextutils.LoggerFrom(ctx)
 	up, ok := in.Obj.(*v1alpha1.Backend)
 	if !ok {
 		log.DPanic("failed to cast backend object")
-		return
+		return nil
 	}
 	ir, ok := in.ObjIr.(*BackendIr)
 	if !ok {
 		log.DPanic("failed to cast backend ir")
-		return
+		return nil
 	}
 
 	// TODO(tim): Bubble up error to Backend status once https://github.com/kgateway-dev/kgateway/issues/10555
@@ -279,6 +279,7 @@ func processBackend(ctx context.Context, in ir.BackendObjectIR, out *envoy_confi
 			log.Error(err)
 		}
 	}
+	return nil
 }
 
 // hostname returns the hostname for the backend. Only static backends are supported.
@@ -319,14 +320,13 @@ func (p *backendPlugin) Name() string {
 func (p *backendPlugin) ApplyListenerPlugin(ctx context.Context, pCtx *ir.ListenerContext, out *envoy_config_listener_v3.Listener) {
 }
 
-func (p *backendPlugin) ApplyHCM(ctx context.Context, pCtx *ir.HcmContext, out *envoy_hcm.HttpConnectionManager) error { //no-op
+func (p *backendPlugin) ApplyHCM(ctx context.Context, pCtx *ir.HcmContext, out *envoy_hcm.HttpConnectionManager) error { // no-op
 	return nil
 }
 
 func (p *backendPlugin) ApplyVhostPlugin(ctx context.Context, pCtx *ir.VirtualHostContext, out *envoy_config_route_v3.VirtualHost) {
 }
 
-// called 0 or more times
 func (p *backendPlugin) ApplyForRoute(ctx context.Context, pCtx *ir.RouteContext, outputRoute *envoy_config_route_v3.Route) error {
 	return nil
 }
