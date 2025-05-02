@@ -1,4 +1,4 @@
-package httplistenerpolicy
+package trafficpolicy
 
 import (
 	"context"
@@ -16,7 +16,7 @@ func getPolicyStatusFn(
 	cl client.Client,
 ) extensionsplug.GetPolicyStatusFn {
 	return func(ctx context.Context, nn types.NamespacedName) (gwv1alpha2.PolicyStatus, error) {
-		res := v1alpha1.HTTPListenerPolicy{}
+		res := v1alpha1.TrafficPolicy{}
 		err := cl.Get(ctx, nn, &res)
 		if err != nil {
 			return gwv1alpha2.PolicyStatus{}, err
@@ -29,7 +29,7 @@ func patchPolicyStatusFn(
 	cl client.Client,
 ) extensionsplug.PatchPolicyStatusFn {
 	return func(ctx context.Context, nn types.NamespacedName, policyStatus gwv1alpha2.PolicyStatus) error {
-		res := v1alpha1.HTTPListenerPolicy{}
+		res := v1alpha1.TrafficPolicy{}
 		err := cl.Get(ctx, nn, &res)
 		if err != nil {
 			return err
