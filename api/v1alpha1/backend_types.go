@@ -217,7 +217,6 @@ type StaticBackend struct {
 
 	// AppProtocol is the application protocol to use when communicating with the backend.
 	// +optional
-	// +kubebuilder:validation:Optional
 	AppProtocol *AppProtocol `json:"appProtocol,omitempty"`
 }
 

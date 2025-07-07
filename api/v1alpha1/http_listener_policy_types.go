@@ -154,30 +154,30 @@ type CommonGrpcService struct {
 
 	// The :authority header in the grpc request. If this field is not set, the authority header value will be cluster_name.
 	// Note that this authority does not override the SNI. The SNI is provided by the transport socket of the cluster.
-	// +kubebuilder:validation:Optional
+	// +optional
 	Authority *string `json:"authority,omitempty"`
 
 	// Maximum gRPC message size that is allowed to be received. If a message over this limit is received, the gRPC stream is terminated with the RESOURCE_EXHAUSTED error.
 	// Defaults to 0, which means unlimited.
-	// +kubebuilder:validation:Optional
+	// +optional
 	MaxReceiveMessageLength *uint32 `json:"maxReceiveMessageLength,omitempty"`
 
 	// This provides gRPC client level control over envoy generated headers. If false, the header will be sent but it can be overridden by per stream option. If true, the header will be removed and can not be overridden by per stream option. Default to false.
-	// +kubebuilder:validation:Optional
+	// +optional
 	SkipEnvoyHeaders *bool `json:"skipEnvoyHeaders,omitempty"`
 
 	// The timeout for the gRPC request. This is the timeout for a specific request
-	// +kubebuilder:validation:Optional
+	// +optional
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
 
 	// Additional metadata to include in streams initiated to the GrpcService.
 	// This can be used for scenarios in which additional ad hoc authorization headers (e.g. x-foo-bar: baz-key) are to be injected
-	// +kubebuilder:validation:Optional
+	// +optional
 	InitialMetadata []HeaderValue `json:"initialMetadata,omitempty"`
 
 	// Indicates the retry policy for re-establishing the gRPC stream.
 	// If max interval is not provided, it will be set to ten times the provided base interval
-	// +kubebuilder:validation:Optional
+	// +optional
 	RetryPolicy *RetryPolicy `json:"retryPolicy,omitempty"`
 }
 
@@ -189,7 +189,7 @@ type HeaderValue struct {
 	Key string `json:"key"`
 
 	// Header value.
-	// +kubebuilder:validation:Optional
+	// +optional
 	Value string `json:"value,omitempty"`
 }
 
@@ -198,11 +198,11 @@ type HeaderValue struct {
 type RetryPolicy struct {
 	// Specifies parameters that control retry backoff strategy.
 	// the default base interval is 1000 milliseconds and the default maximum interval is 10 times the base interval.
-	// +kubebuilder:validation:Optional
+	// +optional
 	RetryBackOff *BackoffStrategy `json:"retryBackOff,omitempty"`
 
 	// Specifies the allowed number of retries. Defaults to 1.
-	// +kubebuilder:validation:Optional
+	// +optional
 	NumRetries *uint32 `json:"numRetries,omitempty"`
 }
 
@@ -214,7 +214,7 @@ type BackoffStrategy struct {
 	BaseInterval metav1.Duration `json:"baseInterval"`
 
 	// Specifies the maximum interval between retries. This parameter is optional, but must be greater than or equal to the base_interval if set. The default is 10 times the base_interval.
-	// +kubebuilder:validation:Optional
+	// +optional
 	MaxInterval *metav1.Duration `json:"maxInterval,omitempty"`
 }
 
@@ -226,15 +226,15 @@ type OpenTelemetryAccessLogService struct {
 	GrpcService CommonAccessLogGrpcService `json:"grpcService"`
 
 	// OpenTelemetry LogResource fields, following Envoy access logging formatting.
-	// +kubebuilder:validation:Optional
+	// +optional
 	Body *string `json:"body,omitempty"`
 
 	// If specified, Envoy will not generate built-in resource labels like log_name, zone_name, cluster_name, node_name.
-	// +kubebuilder:validation:Optional
+	// +optional
 	DisableBuiltinLabels *bool `json:"disableBuiltinLabels,omitempty"`
 
 	// Additional attributes that describe the specific event occurrence.
-	// +kubebuilder:validation:Optional
+	// +optional
 	Attributes *KeyAnyValueList `json:"attributes,omitempty"`
 }
 
@@ -392,38 +392,38 @@ type Tracing struct {
 	Provider TracingProvider `json:"provider"`
 
 	// Target percentage of requests managed by this HTTP connection manager that will be force traced if the x-client-trace-id header is set. Defaults to 100%
-	// +kubebuilder:validation:Optional
+	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
 	ClientSampling *uint32 `json:"clientSampling,omitempty"`
 
 	// Target percentage of requests managed by this HTTP connection manager that will be randomly selected for trace generation, if not requested by the client or not forced. Defaults to 100%
-	// +kubebuilder:validation:Optional
+	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
 	RandomSampling *uint32 `json:"randomSampling,omitempty"`
 
 	// Target percentage of requests managed by this HTTP connection manager that will be traced after all other sampling checks have been applied (client-directed, force tracing, random sampling). Defaults to 100%
-	// +kubebuilder:validation:Optional
+	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
 	OverallSampling *uint32 `json:"overallSampling,omitempty"`
 
 	// Whether to annotate spans with additional data. If true, spans will include logs for stream events. Defaults to false
-	// +kubebuilder:validation:Optional
+	// +optional
 	Verbose *bool `json:"verbose,omitempty"`
 
 	// Maximum length of the request path to extract and include in the HttpUrl tag. Used to truncate lengthy request paths to meet the needs of a tracing backend. Default: 256
-	// +kubebuilder:validation:Optional
+	// +optional
 	MaxPathTagLength *uint32 `json:"maxPathTagLength,omitempty"`
 
 	// A list of attributes with a unique name to create attributes for the active span.
-	// +kubebuilder:validation:Optional
+	// +optional
 	Attributes []CustomAttribute `json:"attributes,omitempty"`
 
 	// Create separate tracing span for each upstream request if true. Defaults to false
 	// Link to envoy docs for more info
-	// +kubebuilder:validation:Optional
+	// +optional
 	SpawnUpstreamSpan *bool `json:"spawnUpstreamSpan,omitempty"`
 }
 
@@ -437,19 +437,19 @@ type CustomAttribute struct {
 	Name string `json:"name"`
 
 	// A literal attribute value.
-	// +kubebuilder:validation:Optional
+	// +optional
 	Literal *CustomAttributeLiteral `json:"literal,omitempty"`
 
 	// An environment attribute value.
-	// +kubebuilder:validation:Optional
+	// +optional
 	Environment *CustomAttributeEnvironment `json:"environment,omitempty"`
 
 	// A request header attribute value.
-	// +kubebuilder:validation:Optional
+	// +optional
 	RequestHeader *CustomAttributeHeader `json:"requestHeader,omitempty"`
 
 	// An attribute to obtain the value from the metadata.
-	// +kubebuilder:validation:Optional
+	// +optional
 	Metadata *CustomAttributeMetadata `json:"metadata,omitempty"`
 }
 
@@ -470,7 +470,7 @@ type CustomAttributeEnvironment struct {
 
 	// When the environment variable is not found, the attribute value will be populated with this default value if specified,
 	// otherwise no attribute will be populated.
-	// +kubebuilder:validation:Optional
+	// +optional
 	DefaultValue *string `json:"defaultValue,omitempty"`
 }
 
@@ -483,7 +483,7 @@ type CustomAttributeHeader struct {
 
 	// When the header does not exist, the attribute value will be populated with this default value if specified,
 	// otherwise no attribute will be populated.
-	// +kubebuilder:validation:Optional
+	// +optional
 	DefaultValue *string `json:"defaultValue,omitempty"`
 }
 
@@ -499,7 +499,7 @@ type CustomAttributeMetadata struct {
 	MetadataKey MetadataKey `json:"metadataKey"`
 
 	// When no valid metadata is found, the attribute value would be populated with this default value if specified, otherwise no attribute would be populated.
-	// +kubebuilder:validation:Optional
+	// +optional
 	DefaultValue *string `json:"defaultValue,omitempty"`
 }
 
@@ -558,12 +558,12 @@ type OpenTelemetryTracingConfig struct {
 	ServiceName string `json:"serviceName"`
 
 	// An ordered list of resource detectors. Currently supported values are `EnvironmentResourceDetector`
-	// +kubebuilder:validation:Optional
+	// +optional
 	ResourceDetectors []ResourceDetector `json:"resourceDetectors,omitempty"`
 
 	// Specifies the sampler to be used by the OpenTelemetry tracer. This field can be left empty. In this case, the default Envoy sampling decision is used.
 	// Currently supported values are `AlwaysOn`
-	// +kubebuilder:validation:Optional
+	// +optional
 	Sampler *Sampler `json:"sampler,omitempty"`
 }
 
