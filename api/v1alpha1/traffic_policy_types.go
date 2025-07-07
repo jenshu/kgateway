@@ -378,7 +378,7 @@ type CSRFPolicy struct {
 	// Specifies additional source origins that will be allowed in addition to the destination origin.
 	// +optional
 	// +kubebuilder:validation:MaxItems=16
-	AdditionalOrigins []*StringMatcher `json:"additionalOrigins,omitempty"`
+	AdditionalOrigins []StringMatcher `json:"additionalOrigins,omitempty"`
 }
 
 type Buffer struct {
