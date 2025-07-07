@@ -57,9 +57,9 @@ func (in *DirectResponse) GetStatusCode() uint32 {
 }
 
 // GetBody returns the content to be returned in the HTTP response body.
-func (in *DirectResponse) GetBody() string {
+func (in *DirectResponse) GetBody() *string {
 	if in == nil {
-		return ""
+		return nil
 	}
 	return in.Spec.Body
 }

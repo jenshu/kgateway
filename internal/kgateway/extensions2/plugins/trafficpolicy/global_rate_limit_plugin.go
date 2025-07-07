@@ -8,6 +8,7 @@ import (
 	ratev3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/ratelimit/v3"
 	"google.golang.org/protobuf/proto"
 	"istio.io/istio/pkg/kube/krt"
+	"k8s.io/utils/ptr"
 
 	"github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/internal/kgateway/extensions2/pluginutils"
@@ -124,13 +125,14 @@ func createRateLimitActions(descriptors []v1alpha1.RateLimitDescriptor) ([]*rout
 					},
 				}
 			case v1alpha1.RateLimitDescriptorEntryTypeHeader:
-				if entry.Header == "" {
+				header := ptr.Deref(entry.Header, "")
+				if header == "" {
 					return nil, fmt.Errorf("header entry requires Header field to be set")
 				}
 				action.ActionSpecifier = &routev3.RateLimit_Action_RequestHeaders_{
 					RequestHeaders: &routev3.RateLimit_Action_RequestHeaders{
-						HeaderName:    entry.Header,
-						DescriptorKey: entry.Header, // Use header name as key
+						HeaderName:    header,
+						DescriptorKey: header, // Use header name as key
 					},
 				}
 			case v1alpha1.RateLimitDescriptorEntryTypeRemoteAddress:

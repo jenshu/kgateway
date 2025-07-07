@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_config_route_v3 "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
@@ -131,7 +132,7 @@ func (p *directResponsePluginGwPass) ApplyForRoute(ctx context.Context, pCtx *ir
 			Status: dr.spec.StatusCode,
 			Body: &corev3.DataSource{
 				Specifier: &corev3.DataSource_InlineString{
-					InlineString: dr.spec.Body,
+					InlineString: ptr.Deref(dr.spec.Body, ""),
 				},
 			},
 		},
