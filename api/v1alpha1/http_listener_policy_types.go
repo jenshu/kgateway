@@ -140,7 +140,7 @@ type CommonAccessLogGrpcService struct {
 	CommonGrpcService `json:",inline"`
 
 	// name of log stream
-	// +kubebuilder:validation:Required
+	// +required
 	LogName string `json:"logName"`
 }
 
@@ -149,7 +149,7 @@ type CommonAccessLogGrpcService struct {
 // Ref: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/grpc_service.proto#envoy-v3-api-msg-config-core-v3-grpcservice-envoygrpc
 type CommonGrpcService struct {
 	// The backend gRPC service. Can be any type of supported backend (Kubernetes Service, kgateway Backend, etc..)
-	// +kubebuilder:validation:Required
+	// +required
 	BackendRef *gwv1.BackendRef `json:"backendRef"`
 
 	// The :authority header in the grpc request. If this field is not set, the authority header value will be cluster_name.
@@ -185,12 +185,12 @@ type CommonGrpcService struct {
 // Ref: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/base.proto#envoy-v3-api-msg-config-core-v3-headervalue
 type HeaderValue struct {
 	// Header name.
-	// +kubebuilder:validation:Required
+	// +required
 	Key string `json:"key"`
 
 	// Header value.
 	// +optional
-	Value string `json:"value,omitempty"`
+	Value *string `json:"value,omitempty"`
 }
 
 // Specifies the retry policy of remote data source when fetching fails.
@@ -210,7 +210,7 @@ type RetryPolicy struct {
 // Ref: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/core/v3/backoff.proto#envoy-v3-api-msg-config-core-v3-backoffstrategy
 type BackoffStrategy struct {
 	// The base interval to be used for the next back off computation. It should be greater than zero and less than or equal to max_interval.
-	// +kubebuilder:validation:Required
+	// +required
 	BaseInterval metav1.Duration `json:"baseInterval"`
 
 	// Specifies the maximum interval between retries. This parameter is optional, but must be greater than or equal to the base_interval if set. The default is 10 times the base_interval.
@@ -222,7 +222,7 @@ type BackoffStrategy struct {
 // Ref: https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/access_loggers/open_telemetry/v3/logs_service.proto
 type OpenTelemetryAccessLogService struct {
 	// Send access logs to gRPC service
-	// +kubebuilder:validation:Required
+	// +required
 	GrpcService CommonAccessLogGrpcService `json:"grpcService"`
 
 	// OpenTelemetry LogResource fields, following Envoy access logging formatting.
@@ -248,10 +248,10 @@ type KeyAnyValueList struct {
 // KeyValue is a key-value pair that is used to store Span attributes, Link attributes, etc.
 type KeyAnyValue struct {
 	// Attribute keys must be unique
-	// +kubebuilder:validation:Required
+	// +required
 	Key string `json:"key"`
 	// Value may contain a primitive value such as a string or integer or it may contain an arbitrary nested object containing arrays, key-value lists and primitives.
-	// +kubebuilder:validation:Required
+	// +required
 	Value AnyValue `json:"value"`
 }
 
@@ -388,7 +388,7 @@ type GrpcStatusFilter struct {
 // Ref: https://www.envoyproxy.io/docs/envoy/latest/api-v3/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto#extensions-filters-network-http-connection-manager-v3-httpconnectionmanager-tracing
 type Tracing struct {
 	// Provider defines the upstream to which envoy sends traces
-	// +kubebuilder:validation:Required
+	// +required
 	Provider TracingProvider `json:"provider"`
 
 	// Target percentage of requests managed by this HTTP connection manager that will be force traced if the x-client-trace-id header is set. Defaults to 100%
@@ -433,7 +433,7 @@ type Tracing struct {
 // +kubebuilder:validation:MinProperties=1
 type CustomAttribute struct {
 	// The name of the attribute
-	// +kubebuilder:validation:Required
+	// +required
 	Name string `json:"name"`
 
 	// A literal attribute value.
@@ -457,7 +457,7 @@ type CustomAttribute struct {
 // Ref: https://www.envoyproxy.io/docs/envoy/latest/api-v3/type/tracing/v3/custom_tag.proto#type-tracing-v3-customtag-literal
 type CustomAttributeLiteral struct {
 	// Static literal value to populate the attribute value.
-	// +kubebuilder:validation:Required
+	// +required
 	Value string `json:"value"`
 }
 
@@ -465,7 +465,7 @@ type CustomAttributeLiteral struct {
 // Ref: https://www.envoyproxy.io/docs/envoy/latest/api-v3/type/tracing/v3/custom_tag.proto#type-tracing-v3-customtag-environment
 type CustomAttributeEnvironment struct {
 	// Environment variable name to obtain the value to populate the attribute value.
-	// +kubebuilder:validation:Required
+	// +required
 	Name string `json:"name"`
 
 	// When the environment variable is not found, the attribute value will be populated with this default value if specified,
@@ -478,7 +478,7 @@ type CustomAttributeEnvironment struct {
 // https://www.envoyproxy.io/docs/envoy/latest/api-v3/type/tracing/v3/custom_tag.proto#type-tracing-v3-customtag-header
 type CustomAttributeHeader struct {
 	// Header name to obtain the value to populate the attribute value.
-	// +kubebuilder:validation:Required
+	// +required
 	Name string `json:"name"`
 
 	// When the header does not exist, the attribute value will be populated with this default value if specified,
@@ -491,11 +491,11 @@ type CustomAttributeHeader struct {
 // Ref: https://www.envoyproxy.io/docs/envoy/latest/api-v3/type/tracing/v3/custom_tag.proto#type-tracing-v3-customtag-metadata
 type CustomAttributeMetadata struct {
 	// Specify what kind of metadata to obtain attribute value from
-	// +kubebuilder:validation:Required
+	// +required
 	Kind MetadataKind `json:"kind"`
 
 	// Metadata key to define the path to retrieve the attribute value.
-	// +kubebuilder:validation:Required
+	// +required
 	MetadataKey MetadataKey `json:"metadataKey"`
 
 	// When no valid metadata is found, the attribute value would be populated with this default value if specified, otherwise no attribute would be populated.
@@ -522,19 +522,19 @@ const (
 // MetadataKey provides a way to retrieve values from Metadata using a key and a path.
 type MetadataKey struct {
 	// The key name of the Metadata from which to retrieve the Struct
-	// +kubebuilder:validation:Required
+	// +required
 	Key string `json:"key"`
 
 	// The path used to retrieve a specific Value from the Struct. This can be either a prefix or a full path,
 	// depending on the use case
-	// +kubebuilder:validation:Required
+	// +required
 	Path []MetadataPathSegment `json:"path"`
 }
 
 // Specifies a segment in a path for retrieving values from Metadata.
 type MetadataPathSegment struct {
 	// The key used to retrieve the value in the struct
-	// +kubebuilder:validation:Required
+	// +required
 	Key string `json:"key"`
 }
 
@@ -550,11 +550,11 @@ type TracingProvider struct {
 // See here for more information: https://www.envoyproxy.io/docs/envoy/latest/api-v3/config/trace/v3/opentelemetry.proto.html
 type OpenTelemetryTracingConfig struct {
 	// Send traces to the gRPC service
-	// +kubebuilder:validation:Required
+	// +required
 	GrpcService CommonGrpcService `json:"grpcService"`
 
 	// The name for the service. This will be populated in the ResourceSpan Resource attributes
-	// +kubebuilder:validation:Required
+	// +required
 	ServiceName string `json:"serviceName"`
 
 	// An ordered list of resource detectors. Currently supported values are `EnvironmentResourceDetector`

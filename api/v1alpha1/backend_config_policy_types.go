@@ -207,7 +207,7 @@ type TLS struct {
 
 	// The SNI domains that should be considered for TLS connection
 	// +optional
-	Sni string `json:"sni,omitempty"`
+	Sni *string `json:"sni,omitempty"`
 
 	// Verify that the Subject Alternative Name in the peer certificate is one of the specified values.
 	// note that a root_ca must be provided if this option is used.
@@ -267,13 +267,13 @@ type Parameters struct {
 // +kubebuilder:validation:XValidation:rule="has(self.tlsCertificate) || has(self.tlsKey) || has(self.rootCA)",message="At least one of tlsCertificate, tlsKey, or rootCA must be set in TLSFiles"
 type TLSFiles struct {
 	// +optional
-	TLSCertificate string `json:"tlsCertificate,omitempty"`
+	TLSCertificate *string `json:"tlsCertificate,omitempty"`
 
 	// +optional
-	TLSKey string `json:"tlsKey,omitempty"`
+	TLSKey *string `json:"tlsKey,omitempty"`
 
 	// +optional
-	RootCA string `json:"rootCA,omitempty"`
+	RootCA *string `json:"rootCA,omitempty"`
 }
 
 // +kubebuilder:validation:AtMostOneOf=leastRequest;roundRobin;ringHash;maglev;random
@@ -398,7 +398,7 @@ type SlowStart struct {
 	// Once host exits slow start, time_factor and aggression no longer affect its weight.
 	// +optional
 	// +kubebuilder:validation:XValidation:rule="self == \"\" || (self.matches('^-?(?:[0-9]+(?:\\\\.[0-9]*)?|\\\\.[0-9]+)$') && double(self) > 0.0)",message="Aggression, if specified, must be a string representing a number greater than 0.0"
-	Aggression string `json:"aggression,omitempty"`
+	Aggression *string `json:"aggression,omitempty"`
 
 	// Minimum weight percentage of an endpoint during slow start.
 	// +optional

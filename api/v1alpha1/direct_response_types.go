@@ -42,7 +42,7 @@ type DirectResponseSpec struct {
 	//
 	// +kubebuilder:validation:MaxLength=4096
 	// +optional
-	Body string `json:"body,omitempty"`
+	Body *string `json:"body,omitempty"`
 }
 
 // DirectResponseStatus defines the observed state of a DirectResponse.

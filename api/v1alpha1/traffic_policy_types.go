@@ -202,7 +202,7 @@ type ExtAuthPolicy struct {
 	// When set to "DisableAll", the filter is disabled for this route.
 	// When empty, the filter is enabled as long as it is not disabled by another policy.
 	// +optional
-	Enablement ExtAuthEnabled `json:"enablement,omitempty"`
+	Enablement *ExtAuthEnabled `json:"enablement,omitempty"`
 
 	// WithRequestBody allows the request body to be buffered and sent to the authorization service.
 	// Warning buffering has implications for streaming and therefore performance.
@@ -253,7 +253,7 @@ type LocalRateLimitPolicy struct {
 	// TokenBucket represents the configuration for a token bucket local rate-limiting mechanism.
 	// It defines the parameters for controlling the rate at which requests are allowed.
 	// +optional
-	TokenBucket *TokenBucket `json:"tokenBucket"`
+	TokenBucket *TokenBucket `json:"tokenBucket,omitempty"`
 }
 
 // TokenBucket defines the configuration for a token bucket rate-limiting mechanism.
@@ -338,7 +338,7 @@ type RateLimitDescriptorEntry struct {
 	// Header specifies a request header to extract the descriptor value from.
 	// This field must be specified when Type is Header.
 	// +optional
-	Header string `json:"header,omitempty"`
+	Header *string `json:"header,omitempty"`
 }
 
 // RateLimitDescriptorEntryGeneric defines a generic key-value descriptor entry.
