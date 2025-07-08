@@ -22,9 +22,9 @@ These are the steps required to add a new CRD to be used in the Kubernetes Gatew
 ## API guidelines
 - Include documentation as well as any appropriate json and kubebuilder annotations on all fields.
 - Document the default value for each field, if applicable.
-- For required fields, use the `+required` marker.
 - For optional fields:
     - Use the `+optional` marker.
     - Use the `omitempty` json struct tag.
     - Use pointer types (e.g. `*string`), unless the type has a nil zero value (e.g. slices/maps). An exception is if the field has a default value (`+kubebuilder:default=...`); then it it acceptable to use a non-pointer type.
+- If a field is not marked as optional, then it is implicitly required.
 - Avoid using slices with pointers (e.g. use `[]string` instead of `[]*string`). See: https://github.com/kubernetes/code-generator/issues/166
