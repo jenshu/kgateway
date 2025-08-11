@@ -3,6 +3,7 @@ package base
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/onsi/gomega"
@@ -18,15 +19,27 @@ import (
 
 // TestCase defines the manifests and resources used by a test or test suite.
 type TestCase struct {
-	// Manifest files
+	// Manifests contains a list of manifest filenames.
 	Manifests []string
-	// Resources expected to be created by manifest
+	// Resources contains a list of objects that are expected to be created by the manifest files.
 	Resources []client.Object
+
+	// ManifestTemplates contains a list of manifest template files, which may contain env variables (e.g. ${INSTALL_NAMESPACE}).
+	// The variables are substituted at runtime with the corresponding env variable values.
+	ManifestTemplates []string
+	// ResourcesFromTemplates is a function that returns the resources expected to be created by the manifest templates.
+	// The resources may depend on information that's not available until runtime, via the TestInstallation (e.g. the install namespace).
+	ResourcesFromTemplates func(ti *e2e.TestInstallation) []client.Object
+
 	// values file passed during an upgrade
 	// UpgradeValues string
 	// Rollback method to be called during cleanup.
 	// Do not provide this. Calling an upgrade returns this method which we save
 	//Rollback func() error
+
+	// expandedTemplates is a map from the manifest template name to the resulting yaml after env variable substitution.
+	// this is populated when ApplyManifests or DeleteManifests is called.
+	expandedTemplates map[string]string
 }
 
 type BaseTestingSuite struct {
@@ -156,12 +169,25 @@ func (s *BaseTestingSuite) ApplyManifests(testCase TestCase) {
 		}, 10*time.Second, 1*time.Second).Should(gomega.Succeed(), "can apply "+manifest)
 	}
 
+	// expand the manifest templates (if necessary) and apply them
+	s.expandManifestTemplates(&testCase)
+	for templateFile, manifestContents := range testCase.expandedTemplates {
+		gomega.Eventually(func() error {
+			err := s.TestInstallation.Actions.Kubectl().Apply(s.Ctx, []byte(manifestContents))
+			return err
+		}, 10*time.Second, 1*time.Second).Should(gomega.Succeed(), "can apply "+templateFile)
+	}
+
 	// wait until the resources are created
-	s.TestInstallation.Assertions.EventuallyObjectsExist(s.Ctx, testCase.Resources...)
+	allResources := testCase.Resources
+	if testCase.ResourcesFromTemplates != nil {
+		allResources = append(allResources, testCase.ResourcesFromTemplates(s.TestInstallation)...)
+	}
+	s.TestInstallation.Assertions.EventuallyObjectsExist(s.Ctx, allResources...)
 
 	// wait until pods are ready; this assumes that pods use a well-known label
 	// app.kubernetes.io/name=<name>
-	for _, resource := range testCase.Resources {
+	for _, resource := range allResources {
 		var ns, name string
 		if pod, ok := resource.(*corev1.Pod); ok {
 			ns = pod.Namespace
@@ -188,5 +214,43 @@ func (s *BaseTestingSuite) DeleteManifests(testCase TestCase) {
 		}, 10*time.Second, 1*time.Second).Should(gomega.Succeed(), "can delete "+manifest)
 	}
 
-	s.TestInstallation.Assertions.EventuallyObjectsNotExist(s.Ctx, testCase.Resources...)
+	// expand the manifest templates (if necessary) and delete them
+	s.expandManifestTemplates(&testCase)
+	for templateFile, manifestContents := range testCase.expandedTemplates {
+		gomega.Eventually(func() error {
+			err := s.TestInstallation.Actions.Kubectl().DeleteSafe(s.Ctx, []byte(manifestContents))
+			return err
+		}, 10*time.Second, 1*time.Second).Should(gomega.Succeed(), "can delete "+templateFile)
+	}
+
+	// wait until the resources are deleted
+	allResources := testCase.Resources
+	if testCase.ResourcesFromTemplates != nil {
+		allResources = append(allResources, testCase.ResourcesFromTemplates(s.TestInstallation)...)
+	}
+	s.TestInstallation.Assertions.EventuallyObjectsNotExist(s.Ctx, allResources...)
+
+	// wait until pods created by deployments are deleted; this assumes that pods use a well-known label
+	// app.kubernetes.io/name=<name>
+	for _, resource := range allResources {
+		if deployment, ok := resource.(*appsv1.Deployment); ok {
+			s.TestInstallation.Assertions.EventuallyPodsNotExist(s.Ctx, deployment.Namespace, metav1.ListOptions{
+				LabelSelector: fmt.Sprintf("%s=%s", defaults.WellKnownAppLabel, deployment.Name),
+			}, time.Second*120, time.Second*2)
+		}
+	}
+}
+
+func (s *BaseTestingSuite) expandManifestTemplates(testCase *TestCase) {
+	if testCase.expandedTemplates == nil {
+		testCase.expandedTemplates = make(map[string]string)
+	}
+	for _, templateFile := range testCase.ManifestTemplates {
+		// see if we already have the expanded template stored on the test case
+		if _, ok := testCase.expandedTemplates[templateFile]; !ok {
+			templateContents, err := os.ReadFile(templateFile)
+			s.NoError(err, "can read manifest template "+templateFile)
+			testCase.expandedTemplates[templateFile] = os.ExpandEnv(string(templateContents))
+		}
+	}
 }

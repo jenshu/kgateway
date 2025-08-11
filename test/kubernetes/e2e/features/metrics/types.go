@@ -12,13 +12,14 @@ import (
 
 	v1alpha1 "github.com/kgateway-dev/kgateway/v2/api/v1alpha1"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/fsutils"
+	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e"
 	e2edefaults "github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/defaults"
 	"github.com/kgateway-dev/kgateway/v2/test/kubernetes/e2e/tests/base"
 )
 
 var (
 	// manifests
-	setupManifest = filepath.Join(fsutils.MustGetThisDir(), "testdata", "setup.yaml")
+	setupManifestTemplate = filepath.Join(fsutils.MustGetThisDir(), "testdata", "setup-template.yaml")
 
 	// objects
 	proxyObjectMeta = metav1.ObjectMeta{
@@ -30,12 +31,7 @@ var (
 	proxyService        = &corev1.Service{ObjectMeta: proxyObjectMeta}
 	proxyServiceAccount = &corev1.ServiceAccount{ObjectMeta: proxyObjectMeta}
 
-	kgatewayMetricsObjectMeta = metav1.ObjectMeta{
-		Name:      "kgateway-metrics",
-		Namespace: "kgateway-test",
-	}
-
-	kgatewayMetricsService = &corev1.Service{ObjectMeta: kgatewayMetricsObjectMeta}
+	kgatewayMetricsServiceName = "kgateway-metrics"
 
 	exampleSvc = &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -98,9 +94,8 @@ var (
 	}
 
 	setup = base.TestCase{
-		Manifests: []string{setupManifest, e2edefaults.CurlPodManifest},
+		Manifests: []string{e2edefaults.CurlPodManifest},
 		Resources: []client.Object{
-			kgatewayMetricsService,
 			exampleSvc,
 			proxyDeployment,
 			proxyService,
@@ -113,6 +108,15 @@ var (
 			listenerSet1,
 			httpListenerPolicy1,
 			e2edefaults.CurlPod,
+		},
+		ManifestTemplates: []string{setupManifestTemplate},
+		ResourcesFromTemplates: func(ti *e2e.TestInstallation) []client.Object {
+			return []client.Object{
+				&corev1.Service{ObjectMeta: metav1.ObjectMeta{
+					Name:      kgatewayMetricsServiceName,
+					Namespace: ti.Metadata.InstallNamespace,
+				}},
+			}
 		},
 	}
 

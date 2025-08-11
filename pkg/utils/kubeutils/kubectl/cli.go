@@ -158,6 +158,13 @@ func (c *Cli) Delete(ctx context.Context, content []byte, extraArgs ...string) e
 		Cause()
 }
 
+// DeleteSafe deletes the resources defined in the bytes, and returns an error if one occurred
+// This differs from DeleteFile in that we always append --ignore-not-found
+func (c *Cli) DeleteSafe(ctx context.Context, content []byte, extraArgs ...string) error {
+	safeArgs := append(extraArgs, "--ignore-not-found")
+	return c.Delete(ctx, content, safeArgs...)
+}
+
 // DeleteFile deletes the resources defined in a file, and returns an error if one occurred
 func (c *Cli) DeleteFile(ctx context.Context, fileName string, extraArgs ...string) error {
 	_, err := c.DeleteFileWithOutput(ctx, fileName, extraArgs...)
