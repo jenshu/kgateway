@@ -27,6 +27,9 @@ const (
 	// This is an optional value, so if it is not set, the test suite will use the locally built version of kgateway
 	ReleasedVersion = "RELEASED_VERSION"
 
+	// ClusterName is the name of the cluster used for e2e tests
+	ClusterName = "CLUSTER_NAME"
+
 	// This can be used to override the default KubeCtx created.
 	// The default KubeCtx used is "kind-<ClusterName>"
 	KubeCtx = "KUBE_CTX"
