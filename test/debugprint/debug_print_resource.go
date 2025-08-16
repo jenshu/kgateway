@@ -9,8 +9,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/onsi/ginkgo/v2"
-	"github.com/solo-io/solo-kit/pkg/api/v1/clients/kube/crd"
-	"github.com/solo-io/solo-kit/pkg/api/v1/resources"
 	"sigs.k8s.io/yaml"
 
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/protoutils"
@@ -22,21 +20,6 @@ func PrintYaml(ress ...proto.Message) {
 
 func GinkgoPrintYaml(ress ...proto.Message) {
 	fmt.Fprint(ginkgo.GinkgoWriter, SprintYaml(ress...))
-}
-
-func PrintKube(crd crd.Crd, ress ...resources.InputResource) error {
-	for _, rs := range ress {
-		res, err := crd.KubeResource(rs)
-		if err != nil {
-			return err
-		}
-		yam, err := yaml.Marshal(res)
-		if err != nil {
-			return err
-		}
-		log.Printf("%s", yam)
-	}
-	return nil
 }
 
 func PrintAny(anyVals ...interface{}) {
