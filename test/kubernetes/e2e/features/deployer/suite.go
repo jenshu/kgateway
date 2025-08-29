@@ -215,11 +215,6 @@ func (s *testingSuite) TestSelfManagedGateway() {
 		}
 		if !accepted {
 			// Provide more context about the current gateway conditions for debugging
-			// var conditionDetails []string
-			// for _, condition := range gw.Status.Conditions {
-			// 	conditionDetails = append(conditionDetails, fmt.Sprintf("Type: %s, Status: %s, Reason: %s, Message: %s",
-			// 		condition.Type, condition.Status, condition.Reason, condition.Message))
-			// }
 			fmt.Printf("Gateway not accepted. Current conditions: %v\n", gw.Status.Conditions)
 		}
 		assert.True(c, accepted, "gateway status not accepted")
