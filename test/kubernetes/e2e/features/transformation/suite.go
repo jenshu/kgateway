@@ -414,6 +414,5 @@ func (s *testingSuite) dynamicModuleAssertion(shouldBeLoaded bool) func(ctx cont
 			WithTimeout(time.Second*20).
 			WithPolling(time.Second).
 			Should(gomega.Succeed(), "failed to get expected load of dynamic modules")
-
 	}
 }
