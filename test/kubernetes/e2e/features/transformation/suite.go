@@ -119,12 +119,7 @@ func (s *testingSuite) TearDownSuite() {
 }
 
 func (s *testingSuite) TestGatewayWithTransformedRoute() {
-	s.testInstallation.Assertions.AssertEnvoyAdminApi(
-		s.ctx,
-		proxyObjectMeta,
-		s.dynamicModuleAssertion(false),
-	)
-
+	s.hasDynamicModuleLoaded(false)
 	testCases := []struct {
 		name      string
 		routeName string
@@ -309,12 +304,7 @@ func (s *testingSuite) TestGatewayRustformationsWithTransformedRoute() {
 	s.testInstallation.Assertions.EventuallyPodsRunning(s.ctx, proxyObjectMeta.GetNamespace(), metav1.ListOptions{
 		LabelSelector: "app.kubernetes.io/name=gw",
 	})
-
-	s.testInstallation.Assertions.AssertEnvoyAdminApi(
-		s.ctx,
-		proxyObjectMeta,
-		s.dynamicModuleAssertion(true),
-	)
+	s.hasDynamicModuleLoaded(true)
 
 	testCases := []struct {
 		name      string
@@ -393,26 +383,27 @@ func (s *testingSuite) assertStatus(expected metav1.Condition) {
 	}, currentTimeout, pollingInterval).Should(gomega.Succeed())
 }
 
-func (s *testingSuite) dynamicModuleAssertion(shouldBeLoaded bool) func(ctx context.Context, adminClient *envoyadmincli.Client) {
-	return func(ctx context.Context, adminClient *envoyadmincli.Client) {
-		s.testInstallation.Assertions.Gomega.Eventually(func(g gomega.Gomega) {
-			listener, err := adminClient.GetSingleListenerFromDynamicListeners(context.Background(), "listener~8080")
-			g.Expect(err).ToNot(gomega.HaveOccurred(), "failed to get listener")
+func (s *testingSuite) hasDynamicModuleLoaded(shouldBeLoaded bool) {
+	adminClient, closeFwd, err := envoyadmincli.NewPortForwardedClient(s.ctx, "deploy/"+proxyObjectMeta.Name, proxyObjectMeta.Namespace)
+	s.Assert().NoError(err, "get admin cli for envoy")
 
-			// use a weak filter name check for cyclic imports
-			// also we dont intend for this to be long term so dont worry about pulling it out to wellknown or something like that for now
-			dynamicModuleLoaded := strings.Contains(listener.String(), "dynamic_modules/")
-			if shouldBeLoaded {
-				g.Expect(dynamicModuleLoaded).To(gomega.BeTrue(), fmt.Sprintf("dynamic module not loaded: %v", listener.String()))
-				dynamicModuleRouteConfigured := strings.Contains(listener.String(), "transformation/helper")
-				g.Expect(dynamicModuleRouteConfigured).To(gomega.BeTrue(), fmt.Sprintf("dynamic module routespecific not loaded: %v", listener.String()))
-			} else {
-				g.Expect(dynamicModuleLoaded).To(gomega.BeFalse(), fmt.Sprintf("dynamic module should not be loaded: %v", listener.String()))
-			}
-		}).
-			WithContext(ctx).
-			WithTimeout(time.Second*20).
-			WithPolling(time.Second).
-			Should(gomega.Succeed(), "failed to get expected load of dynamic modules")
-	}
+	s.testInstallation.Assertions.Gomega.Eventually(func(g gomega.Gomega) {
+		listener, err := adminClient.GetSingleListenerFromDynamicListeners(context.Background(), "listener~8080")
+		g.Expect(err).ToNot(gomega.HaveOccurred(), "failed to get listener")
+
+		// use a weak filter name check for cyclic imports
+		// also we dont intend for this to be long term so dont worry about pulling it out to wellknown or something like that for now
+		dynamicModuleLoaded := strings.Contains(listener.String(), "dynamic_modules/")
+		if shouldBeLoaded {
+			g.Expect(dynamicModuleLoaded).To(gomega.BeTrue(), fmt.Sprintf("dynamic module not loaded: %v", listener.String()))
+			dynamicModuleRouteConfigured := strings.Contains(listener.String(), "transformation/helper")
+			g.Expect(dynamicModuleRouteConfigured).To(gomega.BeTrue(), fmt.Sprintf("dynamic module routespecific not loaded: %v", listener.String()))
+		} else {
+			g.Expect(dynamicModuleLoaded).To(gomega.BeFalse(), fmt.Sprintf("dynamic module should not be loaded: %v", listener.String()))
+		}
+	}).
+		WithTimeout(time.Second*20).
+		WithPolling(time.Second).Should(gomega.Succeed(), "failed to get expected load of dynamic modules")
+
+	closeFwd()
 }
