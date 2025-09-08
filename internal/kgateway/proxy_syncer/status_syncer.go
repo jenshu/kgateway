@@ -398,7 +398,6 @@ func (s *StatusSyncer) syncGatewayStatus(ctx context.Context, logger *slog.Logge
 			for _, cond := range gw.Status.Conditions {
 				if cond.Type != string(gwv1.GatewayConditionAccepted) &&
 					cond.Type != string(gwv1.GatewayConditionProgrammed) {
-					logger.Debug("ignoring status condition type", "type", cond.Type, "gateway", gwnn.String())
 					continue
 				}
 
