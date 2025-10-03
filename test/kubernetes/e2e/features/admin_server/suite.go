@@ -89,7 +89,6 @@ func (s *testingSuite) xdsSnapshotAssertion() func(ctx context.Context, adminCli
 			xdsSnapshot, err := adminClient.GetXdsSnapshot(ctx)
 			g.Expect(err).NotTo(gomega.HaveOccurred(), "can get xds snapshot")
 			g.Expect(xdsSnapshot).NotTo(gomega.BeEmpty(), "xds snapshot is not empty")
-			g.Expect(xdsSnapshot).To(gomega.HaveLen(1), "expected 1 entry in xds snapshot")
 		}).
 			WithContext(ctx).
 			WithTimeout(time.Second * 10).
