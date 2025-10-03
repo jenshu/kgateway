@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/solo-io/go-utils/threadsafe"
 
-	"github.com/kgateway-dev/kgateway/v2/pkg/utils/controllerutils/admincli"
+	"github.com/kgateway-dev/kgateway/v2/test/controllerutils/admincli"
 	"github.com/kgateway-dev/kgateway/v2/pkg/utils/requestutils/curl"
 )
 
