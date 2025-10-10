@@ -192,14 +192,6 @@ run-tests: GINKGO_FLAGS += -skip-package=e2e,kgateway,test/kubernetes/testutils/
 run-tests: GINKGO_FLAGS += --label-filter="!end-to-end && !performance"
 run-tests: test
 
-.PHONY: run-performance-tests
-# Performance tests are filtered using a Ginkgo label
-# This means that any tests which do not rely on Ginkgo, will by default be compiled and run
-# Since this is not the desired behavior, we explicitly skip these packages
-run-performance-tests: GINKGO_FLAGS += -skip-package=kgateway,kubernetes/e2e
-run-performance-tests: GINKGO_FLAGS += --label-filter="performance" ## Run only tests with the Performance label
-run-performance-tests: test
-
 .PHONY: run-e2e-tests
 run-e2e-tests: TEST_PKG = ./test/e2e/ ## Run all in-memory E2E tests
 run-e2e-tests: GINKGO_FLAGS += --label-filter="end-to-end && !performance"
@@ -404,8 +396,12 @@ $(ENVOYINIT_OUTPUT_DIR)/envoyinit-linux-$(GOARCH): $(ENVOYINIT_SOURCES)
 envoyinit: $(ENVOYINIT_OUTPUT_DIR)/envoyinit-linux-$(GOARCH)
 
 # TODO(nfuden) cheat the process for now with -r but try to find a cleaner method
-$(ENVOYINIT_OUTPUT_DIR)/Dockerfile.envoyinit: cmd/envoyinit/Dockerfile
-	cp  -r  internal/envoyinit/rustformations $(ENVOYINIT_OUTPUT_DIR)
+# Allow override of Dockerfile for local development
+ENVOYINIT_DOCKERFILE ?= cmd/envoyinit/Dockerfile
+$(ENVOYINIT_OUTPUT_DIR)/Dockerfile.envoyinit: $(ENVOYINIT_DOCKERFILE)
+	@if [ "$(ENVOYINIT_DOCKERFILE)" = "cmd/envoyinit/Dockerfile" ]; then \
+		cp -r internal/envoyinit/rustformations $(ENVOYINIT_OUTPUT_DIR); \
+	fi
 	cp $< $@
 
 $(ENVOYINIT_OUTPUT_DIR)/docker-entrypoint.sh: cmd/envoyinit/docker-entrypoint.sh
