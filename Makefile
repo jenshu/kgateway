@@ -160,8 +160,8 @@ GINKGO_USER_FLAGS ?=
 GINKGO ?= go tool ginkgo
 
 .PHONY: test
-test: ## Run all tests, or only run the test package at {TEST_PKG} if it is specified
-	$(GINKGO_ENV) $(GINKGO) -ldflags='$(LDFLAGS)' \
+test: ## Run all tests with ginkgo, or only run the test package at {TEST_PKG} if it is specified
+	$(GO_TEST_ENV) $(GINKGO_ENV) $(GINKGO) -ldflags='$(LDFLAGS)' \
 		$(GINKGO_FLAGS) $(GINKGO_REPORT_FLAGS) $(GINKGO_USER_FLAGS) \
 		$(TEST_PKG)
 
