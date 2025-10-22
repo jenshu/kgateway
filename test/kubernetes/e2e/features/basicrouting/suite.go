@@ -80,7 +80,7 @@ func (s *testingSuite) assertSuccessfulResponse() {
 			testdefaults.CurlPodExecOpt,
 			[]curl.Option{
 				curl.WithHost(kubeutils.ServiceFQDN(proxyObjectMeta)),
-				curl.WithHostHeader("example.com"),
+				curl.WithHostHeader("example.com123"),
 				curl.WithPort(port),
 			},
 			&testmatchers.HttpResponse{
