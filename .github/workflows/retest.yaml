@@ -22,6 +22,7 @@ jobs:
           echo PR_COMMENT: $PR_COMMENT
           echo PR_NUMBER: $PR_NUMBER
           echo MEMBER: $MEMBER
+          echo "i did set gh token"
 
           if [[ "$PR_COMMENT" != "/retest" ]]; then
             # only care about retest comment
