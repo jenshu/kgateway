@@ -18,4 +18,6 @@ it will trigger the action to run.
 Perform linting on project [Helm Charts](../../install/helm/README.md).
 
 ## Comments That Trigger Workflows
-- Commenting `/retest` (without any other text) on a PR will trigger the [Re-run failed jobs](./retest.yaml) workflow (limited to kgateway org members only). This will re-run any failed jobs from the latest workflow runs on the PR.
+- Commenting `/retest` (without any other text) on a PR will trigger the [retest](./retest.yaml) job (limited to kgateway org members only). This will re-run any failed jobs from the latest workflow runs on the PR.
+- Commenting `/merge` (without any other text) on a PR will trigger the [enable auto-merge](./automerge.yaml) job (limited to kgateway org members only). This will enable auto-merge for the PR.
+- Commenting `/unmerge` (without any other text) on a PR will trigger the [disable auto-merge](./automerge.yaml) job (limited to kgateway org members only). This will disable auto-merge for the PR.
