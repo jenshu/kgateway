@@ -57,7 +57,7 @@ status:
   ancestors:
   - ancestorRef:
       group: gateway.networking.k8s.io
-      kind: HTTPRoute
+      kind: Gateway
       name: test
       namespace: default
     conditions:
