@@ -330,13 +330,14 @@ done
 
 # Generate contributors section
 if [ ${#CONTRIBUTORS_MAP[@]} -gt 0 ]; then
-    echo -e "\n#### Contributors\n" >> "$OUTPUT_FILE"
+    echo -e "\n### Contributors\n" >> "$OUTPUT_FILE"
     echo "Thanks to all the contributors who made this release possible:" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
-    # Sort contributors alphabetically (case-insensitive)
+    # Sort contributors alphabetically (case-insensitive) and display as avatar grid
     for contributor in $(printf '%s\n' "${!CONTRIBUTORS_MAP[@]}" | sort -f); do
-        echo "* [@${contributor}](https://github.com/${contributor})" >> "$OUTPUT_FILE"
+        echo -n "<a href=\"https://github.com/${contributor}\"><img src=\"https://github.com/${contributor}.png\" width=\"50\" alt=\"@${contributor}\"></a> " >> "$OUTPUT_FILE"
     done
+    echo "" >> "$OUTPUT_FILE"
 fi
 
 echo "Release notes have been generated in $OUTPUT_FILE (${SECONDS}s)"
