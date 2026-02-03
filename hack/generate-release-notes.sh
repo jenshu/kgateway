@@ -330,7 +330,7 @@ done
 
 # Generate contributors section
 if [ ${#CONTRIBUTORS_MAP[@]} -gt 0 ]; then
-    echo -e "\n### Contributors\n" >> "$OUTPUT_FILE"
+    echo -e "\n## Contributors\n" >> "$OUTPUT_FILE"
     echo "Thanks to all the contributors who made this release possible:" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
     # Sort contributors alphabetically (case-insensitive) and display as avatar grid
