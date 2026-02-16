@@ -85,6 +85,8 @@ spec:
         app.kubernetes.io/name: gw
         gateway.networking.k8s.io/gateway-class-name: agentgateway
         gateway.networking.k8s.io/gateway-name: gw
+        istio.io/dataplane-mode: none
+        sidecar.istio.io/inject: "false"
     spec:
       containers:
       - args:
@@ -132,7 +134,11 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.serviceAccountName
-        image: cr.agentgateway.dev/custom-repo:0.11.2
+        - name: CA_ADDRESS
+          value: https://my-custom-istiod.custom-namespace.svc:15012
+        - name: TRUST_DOMAIN
+          value: my-custom-trust-domain
+        image: cr.agentgateway.dev/agentgateway:99.99.99
         name: agentgateway
         ports:
         - containerPort: 15020
@@ -143,7 +149,13 @@ spec:
             path: /healthz/ready
             port: 15021
           periodSeconds: 10
-        resources: {}
+        resources:
+          limits:
+            cpu: "2"
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 256Mi
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -168,6 +180,10 @@ spec:
         - mountPath: /var/run/secrets/xds-tokens
           name: xds-token
           readOnly: true
+        - mountPath: /var/run/secrets/istio
+          name: istiod-ca-cert
+        - mountPath: /var/run/secrets/tokens
+          name: istio-token
       securityContext:
         sysctls:
         - name: net.ipv4.ip_unprivileged_port_start
@@ -187,4 +203,14 @@ spec:
               path: xds-token
       - emptyDir: {}
         name: tmp
+      - configMap:
+          name: istio-ca-root-cert
+        name: istiod-ca-cert
+      - name: istio-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: istio-ca
+              expirationSeconds: 43200
+              path: istio-token
 status: {}
