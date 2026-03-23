@@ -13,9 +13,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Sync /kind labels & enforce changelog fields
-        uses: kgateway-dev/pr-kind-labeler@main
+        uses: kgateway-dev/pr-kind-labeler@f15977b7f894730fbaefcc22e2cd4c7c3d3bfcf2 # untagged main
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
