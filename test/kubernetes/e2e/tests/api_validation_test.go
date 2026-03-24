@@ -173,7 +173,7 @@ spec:
     kind: Deployment
     name: test-deployment
 `,
-			wantErrors: []string{"TargetRefs must reference either a Kubernetes Service or a Backend API"},
+			wantErrors: []string{"TargetRefs must reference either a Kubernetes Service, a Backend, or an Istio Hostname"},
 		},
 		{
 			name: "BackendConfigPolicy: invalid target selector",
@@ -189,7 +189,7 @@ spec:
     matchLabels:
       app: myapp
 `,
-			wantErrors: []string{"TargetSelectors must reference either a Kubernetes Service or a Backend API"},
+			wantErrors: []string{"TargetSelectors must reference either a Kubernetes Service, a Backend, or an Istio Hostname"},
 		},
 		{
 			name: "BackendConfigPolicy: invalid aggression",

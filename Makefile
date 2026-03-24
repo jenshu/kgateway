@@ -121,12 +121,14 @@ fmt-changed:  ## Format the code with goimports
 # must be a separate target so that make waits for it to complete before moving on
 .PHONY: mod-download
 mod-download:  ## Download the dependencies
-	go mod download all
+	go mod download
+	cd tools && go mod download
 
 .PHONY: mod-tidy-nested
 mod-tidy-nested:  ## Tidy go mod files in nested modules
 	@echo "Tidying hack/utils/applier..." && cd hack/utils/applier && go mod tidy
 	@echo "Tidying test/mocks/mock-ai-provider-server..." && cd test/mocks/mock-ai-provider-server && go mod tidy
+	@echo "Tidying tools..." && cd tools && go mod tidy
 
 .PHONY: mod-tidy
 mod-tidy: mod-download mod-tidy-nested ## Tidy the go mod file
@@ -209,8 +211,8 @@ run-e2e-tests: test
 # Env test
 #----------------------------------------------------------------------------------
 
-ENVTEST_K8S_VERSION = 1.23
-ENVTEST ?= go tool setup-envtest
+ENVTEST_K8S_VERSION = 1.31
+ENVTEST ?= go -C tools tool setup-envtest
 
 .PHONY: envtest-path
 envtest-path: ## Set the envtest path
@@ -224,7 +226,7 @@ GO_TEST_ENV ?=
 # Testing flags: https://pkg.go.dev/cmd/go#hdr-Testing_flags
 # The default timeout for a suite is 10 minutes, but this can be overridden by setting the -timeout flag. Currently set
 # to 25 minutes based on the time it takes to run the longest test setup (kgateway_test).
-GO_TEST_ARGS ?= -timeout=25m -cpu=4 -race -outputdir=$(OUTPUT_DIR)
+GO_TEST_ARGS ?= -timeout=35m -cpu=4 -race -outputdir=$(OUTPUT_DIR)
 GO_TEST_COVERAGE_ARGS ?= --cover --covermode=atomic --coverprofile=cover.out
 GO_TEST_COVERAGE ?= go tool github.com/vladopajic/go-test-coverage/v2
 

@@ -135,6 +135,7 @@ var _ = Describe("InferencePool controller", func() {
 					TargetPorts: []inf.Port{{Number: 1234}},
 					EndpointPickerRef: inf.EndpointPickerRef{
 						Name: "doesnt-matter",
+						Port: ptr.To(inf.Port{Number: 8080}),
 					},
 				},
 			}
@@ -169,6 +170,7 @@ var _ = Describe("InferencePool controller", func() {
 					TargetPorts: []inf.Port{{Number: 1234}},
 					EndpointPickerRef: inf.EndpointPickerRef{
 						Name: "doesnt-matter",
+						Port: ptr.To(inf.Port{Number: 8080}),
 					},
 				},
 			}
@@ -225,6 +227,7 @@ var _ = Describe("InferencePool controller", func() {
 					TargetPorts: []inf.Port{{Number: 1234}},
 					EndpointPickerRef: inf.EndpointPickerRef{
 						Name: "doesnt-matter",
+						Port: ptr.To(inf.Port{Number: 8080}),
 					},
 				},
 			}
